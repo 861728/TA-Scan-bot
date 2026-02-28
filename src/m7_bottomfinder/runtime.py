@@ -8,6 +8,7 @@ from .ai_layer import AIInterpreter
 from .alert_engine import AlertAction, AlertDecision, AlertEngine
 from .data_layer import Bar, DataCache, DataLayer, normalize_timestamp
 from .indicator_engine import IndicatorEngine, IndicatorResult, SignalSummary
+from .monitoring import RuntimeMetrics
 from .recovery import FetchRecovery
 
 
@@ -46,6 +47,7 @@ class ScannerRuntime:
         alert_engine: AlertEngine,
         ai_interpreter: AIInterpreter,
         notifier: Notifier,
+        metrics: RuntimeMetrics | None = None,
     ) -> None:
         self.cache = cache
         self.data_layer = data_layer
@@ -54,6 +56,7 @@ class ScannerRuntime:
         self.alert_engine = alert_engine
         self.ai_interpreter = ai_interpreter
         self.notifier = notifier
+        self.metrics = metrics
 
     def run_cycle(
         self,
@@ -87,6 +90,13 @@ class ScannerRuntime:
         if decision.should_send:
             message = self._build_alert_text(config, summary, decision, ai.result.summary if ai.result else None)
             self.notifier.send(message)
+
+        if self.metrics is not None:
+            self.metrics.record_cycle(
+                data_source=recovered.source,
+                alert_sent=decision.should_send,
+                ai_called=ai.called,
+            )
 
         return ScanCycleResult(
             timestamp=ts,

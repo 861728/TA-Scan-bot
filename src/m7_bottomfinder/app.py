@@ -12,6 +12,7 @@ from .alert_engine import AlertEngine
 from .data_layer import Bar, DataCache, DataLayer
 from .indicator_engine import IndicatorEngine
 from .indicators import default_phase2_indicators
+from .monitoring import RuntimeMetrics, RuntimeSnapshot
 from .recovery import FetchRecovery
 from .runtime import Notifier, ScanRuntimeConfig, ScannerRuntime
 
@@ -112,6 +113,8 @@ class ScanApplication:
         self.config = config
         self.notifier = notifier or ConsoleNotifier()
 
+        self.metrics = RuntimeMetrics()
+
         cache = DataCache(config.cache_dir)
         self.runtime = ScannerRuntime(
             cache=cache,
@@ -136,6 +139,7 @@ class ScanApplication:
                 ),
             ),
             notifier=self.notifier,
+            metrics=self.metrics,
         )
 
     def run_once(self, fetcher: Callable[[str, str], list[Bar]]) -> None:
@@ -151,3 +155,7 @@ class ScanApplication:
         while True:
             self.run_once(fetcher)
             time.sleep(self.config.interval_seconds)
+
+
+    def get_metrics_snapshot(self) -> RuntimeSnapshot:
+        return self.metrics.snapshot()

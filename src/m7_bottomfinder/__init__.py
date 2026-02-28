@@ -7,6 +7,7 @@ from .backtest import BacktestReport, BacktestSignal, BacktestSimulator, Backtes
 from .data_layer import Bar, CacheMetadata, DataCache, DataLayer, normalize_timestamp
 from .divergence import DivergenceDetector, DivergenceSignal, DivergenceType, Pivot
 from .indicator_engine import BaseIndicator, Indicator, IndicatorEngine, IndicatorResult, SignalDirection, SignalSummary
+from .monitoring import RuntimeMetrics, RuntimeSnapshot
 from .notifiers import SafeNotifier, TelegramNotifier
 from .providers import YahooFinanceFetcher
 from .recovery import FetchRecovery, RecoveryResult
@@ -94,4 +95,6 @@ __all__ = [
     "SafeNotifier",
     "TelegramNotifier",
     "YahooFinanceFetcher",
+    "RuntimeMetrics",
+    "RuntimeSnapshot",
 ]

@@ -128,6 +128,7 @@ Phase 3 핵심 모듈을 추가했습니다.
 - `ScanRuntimeConfig`: 심볼/타임프레임/결측 보정 파라미터 관리
 - `ScanCycleResult`: 사이클 결과(알림 액션, AI 호출 여부, 데이터 소스) 반환
 - `Notifier` 프로토콜: 텔레그램/슬랙 등 전송기 교체 가능 구조
+- `RuntimeMetrics`: 사이클/알림/AI/데이터소스(provider/cache) 카운터 스냅샷 제공
 
 구현 모듈:
 - `src/m7_bottomfinder/runtime.py`
@@ -138,3 +139,4 @@ Phase 3 핵심 모듈을 추가했습니다.
 - `deploy/m7-bottomfinder.service`
 - `tests/test_runtime.py`
 - `tests/test_app.py`
+- `tests/test_monitoring.py`
