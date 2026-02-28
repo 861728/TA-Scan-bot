@@ -95,3 +95,19 @@ Phase 1.5 요구사항에 맞춰 과거 바 데이터 기반 시뮬레이터를 
 구현 모듈:
 - `src/m7_bottomfinder/backtest.py`
 - `tests/test_backtest_simulator.py`
+
+
+## Step 3 구현 상태 (알림 엔진 + AI 브레인 + 예외복구)
+
+Phase 3 핵심 모듈을 추가했습니다.
+
+- `AlertEngine`: 심볼/방향 단위 쿨타임 + 강화 신호(+3) 예외 + 중복 억제
+- `AIInterpreter`: `should_send` + `should_call_ai` 동시 충족 시에만 AI 해석 수행
+- `AIUsageLimiter`: 종목/전체 일일 호출 제한
+- `FetchRecovery`: 데이터 제공자 오류 시 캐시 fallback 복구
+
+구현 모듈:
+- `src/m7_bottomfinder/alert_engine.py`
+- `src/m7_bottomfinder/ai_layer.py`
+- `src/m7_bottomfinder/recovery.py`
+- `tests/test_alert_ai_recovery.py`
