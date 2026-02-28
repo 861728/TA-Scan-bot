@@ -1,9 +1,42 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
+import json
+from urllib import request as _urllib_request
 from typing import Callable
 
 from .data_layer import Bar, normalize_timestamp
+
+
+class KRWConverter:
+    """USD→KRW 환율 조회. open.er-api.com 무료 API 사용 (키 불필요). 10분 캐시."""
+
+    _API_URL = "https://open.er-api.com/v6/latest/USD"
+
+    def __init__(self, cache_minutes: int = 10, timeout: int = 5) -> None:
+        self._cache_minutes = cache_minutes
+        self._timeout = timeout
+        self._rate: float | None = None
+        self._fetched_at: datetime | None = None
+
+    def get_rate(self) -> float | None:
+        """현재 USD/KRW 환율 반환. 실패 시 None."""
+        if self._rate and self._fetched_at:
+            if datetime.utcnow() - self._fetched_at < timedelta(minutes=self._cache_minutes):
+                return self._rate
+        try:
+            req = _urllib_request.Request(self._API_URL, headers={"Accept": "application/json"})
+            with _urllib_request.urlopen(req, timeout=self._timeout) as resp:
+                data = json.loads(resp.read())
+            self._rate = float(data["rates"]["KRW"])
+            self._fetched_at = datetime.utcnow()
+            return self._rate
+        except Exception:
+            return self._rate  # 실패 시 마지막 캐시 값 반환
+
+    def convert(self, usd: float) -> float | None:
+        rate = self.get_rate()
+        return usd * rate if rate else None
 
 
 class YahooFinanceFetcher:

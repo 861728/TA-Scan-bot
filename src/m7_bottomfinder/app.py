@@ -14,6 +14,7 @@ from .data_layer import Bar, DataCache, DataLayer
 from .indicator_engine import IndicatorEngine
 from .indicators import default_phase2_indicators
 from .monitoring import RuntimeMetrics, RuntimeSnapshot
+from .providers import KRWConverter
 from .recovery import FetchRecovery
 from .runtime import Notifier, ScanRuntimeConfig, ScannerRuntime
 
@@ -143,6 +144,7 @@ class ScanApplication:
             ),
             notifier=self.notifier,
             metrics=self.metrics,
+            krw_converter=KRWConverter(),
         )
 
     def run_once(self, fetcher: Callable[[str, str], list[Bar]]) -> None:
