@@ -66,3 +66,18 @@ M7 종목의 바닥권(공포 매도 소진 + 자금 유입)을 수치형 기술
 구현 모듈:
 - `src/m7_bottomfinder/data_layer.py`
 - `tests/test_data_layer.py`
+
+
+## Step B/C 구현 상태 (Phase 2 지표 라이브러리 + 다이버전스 엔진)
+
+Phase 2 개발을 위해 지표 공통 인터페이스와 재사용 가능한 다이버전스 엔진을 추가했습니다.
+
+- 공통 인터페이스: `IndicatorResult(signal, score, evidence, raw_values)`, `IndicatorEngine`
+- 다이버전스 엔진: `DivergenceDetector` (price/indicator 피벗 기반 bullish/bearish 판정)
+- 지표 구현(수치 기반): WVF, Volume Capitulation, OBV Divergence, MFI, CMF, Triple Stoch RSI, A/D Divergence, Composite Oscillator, VPT, NVI/PVI, RSI+SMA200, BB+Stoch, MACD+OBV Divergence, Fibonacci 61.8, Ichimoku+RSI+OBV, K's Reversal, MACD Divergence
+
+구현 모듈:
+- `src/m7_bottomfinder/indicator_engine.py`
+- `src/m7_bottomfinder/divergence.py`
+- `src/m7_bottomfinder/indicators.py`
+- `tests/test_phase2_indicators.py`
