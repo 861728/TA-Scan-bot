@@ -1,6 +1,7 @@
 [runtime]
 symbols = ["AAPL", "MSFT", "GOOG", "AMZN", "NVDA", "META", "TSLA"]
 timeframe = "15m"
+htf_filter = ["1h", "1d"]
 interval_seconds = 600
 cache_dir = "data/cache"
 
@@ -9,13 +10,44 @@ score_threshold = 5
 ai_call_threshold = 6
 min_s_hits_for_ai = 2
 
+[weights]
+# S-grade (3pts each)
+wvf_spike = 3
+volume_capitulation_spike = 3
+obv_divergence = 3
+# A-grade (1pt each)
+mfi = 1
+cmf = 1
+triple_stoch_rsi = 1
+macd_divergence = 1
+ad_line_divergence = 1
+composite_oscillator = 1
+vpt = 1
+nvi_pvi = 1
+rsi_sma200 = 1
+bb_stoch = 1
+macd_obv_divergence = 1
+fibonacci_618 = 1
+ichimoku_rsi_obv = 1
+k_reversal = 1
+
 [alerts]
 cooldown_minutes = 120
 strengthen_delta = 3
+allow_premarket = true
+allow_regular = true
 
 [ai]
 per_symbol_daily = 3
 global_daily = 20
+
+[backtest]
+lookback_months = 12
+precision_rebound_days = 5
+precision_rebound_threshold_pct = 3.0
+target_precision_pct = 70.0
+target_mdd_pct = -5.0
+target_avg_rebound_pct = 5.0
 
 [telegram]
 bot_token = ""
