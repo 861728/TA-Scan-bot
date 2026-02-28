@@ -81,6 +81,8 @@ def test_application_run_once_executes_cycle(tmp_path) -> None:
         strengthen_delta=3,
         ai_per_symbol_daily=3,
         ai_global_daily=20,
+        telegram_bot_token=None,
+        telegram_chat_id=None,
     )
     notifier = CaptureNotifier()
     app = ScanApplication(cfg, notifier=notifier)

@@ -16,3 +16,7 @@ strengthen_delta = 3
 [ai]
 per_symbol_daily = 3
 global_daily = 20
+
+[telegram]
+bot_token = ""
+chat_id = ""

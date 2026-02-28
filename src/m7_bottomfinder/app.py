@@ -29,6 +29,8 @@ class ScanAppConfig:
     strengthen_delta: int
     ai_per_symbol_daily: int
     ai_global_daily: int
+    telegram_bot_token: str | None
+    telegram_chat_id: str | None
 
     @staticmethod
     def from_toml(path: str | Path) -> "ScanAppConfig":
@@ -38,6 +40,7 @@ class ScanAppConfig:
         scoring = payload.get("scoring", {})
         alerts = payload.get("alerts", {})
         ai = payload.get("ai", {})
+        telegram = payload.get("telegram", {})
 
         return ScanAppConfig(
             symbols=list(runtime.get("symbols", ["AAPL"])),
@@ -51,7 +54,16 @@ class ScanAppConfig:
             strengthen_delta=int(alerts.get("strengthen_delta", 3)),
             ai_per_symbol_daily=int(ai.get("per_symbol_daily", 3)),
             ai_global_daily=int(ai.get("global_daily", 20)),
+            telegram_bot_token=_none_if_blank(telegram.get("bot_token")),
+            telegram_chat_id=_none_if_blank(telegram.get("chat_id")),
         )
+
+
+def _none_if_blank(value: object) -> str | None:
+    if value is None:
+        return None
+    s = str(value).strip()
+    return s if s else None
 
 
 def _load_toml_compat(path: Path) -> dict:

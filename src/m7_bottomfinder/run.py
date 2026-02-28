@@ -3,12 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from .app import ScanAppConfig, ScanApplication
-from .data_layer import Bar
-
-
-def default_fetcher(_symbol: str, _timeframe: str) -> list[Bar]:
-    # Provider integration point (e.g., yfinance). Return empty to trigger cache fallback.
-    return []
+from .notifiers import SafeNotifier, TelegramNotifier
+from .providers import YahooFinanceFetcher
 
 
 def main() -> None:
@@ -17,8 +13,13 @@ def main() -> None:
         config_path = Path("config.example.toml")
 
     config = ScanAppConfig.from_toml(config_path)
-    app = ScanApplication(config)
-    app.run_forever(default_fetcher)
+
+    notifier = None
+    if config.telegram_bot_token and config.telegram_chat_id:
+        notifier = SafeNotifier(TelegramNotifier(config.telegram_bot_token, config.telegram_chat_id))
+
+    app = ScanApplication(config, notifier=notifier)
+    app.run_forever(YahooFinanceFetcher())
 
 
 if __name__ == "__main__":

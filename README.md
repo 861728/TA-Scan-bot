@@ -119,6 +119,8 @@ Phase 3 핵심 모듈을 추가했습니다.
 
 
 운영 배포 보강:
+
+- `YahooFinanceFetcher`/`TelegramNotifier` 연동 포인트 추가 (실데이터/실알림 연결)
 - `ScanApplication`/`run.py` 엔트리포인트 추가 (`config.toml` 기반 실행)
 - `deploy/m7-bottomfinder.service` systemd 템플릿 추가
 
@@ -131,6 +133,8 @@ Phase 3 핵심 모듈을 추가했습니다.
 - `src/m7_bottomfinder/runtime.py`
 - `src/m7_bottomfinder/app.py`
 - `src/m7_bottomfinder/run.py`
+- `src/m7_bottomfinder/providers.py`
+- `src/m7_bottomfinder/notifiers.py`
 - `deploy/m7-bottomfinder.service`
 - `tests/test_runtime.py`
 - `tests/test_app.py`
