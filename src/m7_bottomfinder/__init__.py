@@ -1,5 +1,6 @@
 """M7 BottomFinder package."""
 
+from .app import ConsoleNotifier, ScanAppConfig, ScanApplication
 from .ai_layer import AIInterpretation, AIInterpreter, AIInvocation, AIProvider, AIUsageLimiter, RuleBasedProvider
 from .alert_engine import AlertAction, AlertDecision, AlertEngine, AlertRecord
 from .backtest import BacktestReport, BacktestSignal, BacktestSimulator, BacktestTradeResult, extract_active_results, summarize_kpi
@@ -79,6 +80,9 @@ __all__ = [
     "AIProvider",
     "AIUsageLimiter",
     "RuleBasedProvider",
+    "ScanAppConfig",
+    "ScanApplication",
+    "ConsoleNotifier",
     "FetchRecovery",
     "RecoveryResult",
     "Notifier",

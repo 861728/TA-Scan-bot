@@ -117,6 +117,11 @@ Phase 3 핵심 모듈을 추가했습니다.
 
 운영 단계(Phase 4) 진입을 위해 스캔 파이프라인 오케스트레이터를 추가했습니다.
 
+
+운영 배포 보강:
+- `ScanApplication`/`run.py` 엔트리포인트 추가 (`config.toml` 기반 실행)
+- `deploy/m7-bottomfinder.service` systemd 템플릿 추가
+
 - `ScannerRuntime.run_cycle`: fetch/recovery -> cache update -> indicator scoring -> alert gating -> AI call -> notify 순서 실행
 - `ScanRuntimeConfig`: 심볼/타임프레임/결측 보정 파라미터 관리
 - `ScanCycleResult`: 사이클 결과(알림 액션, AI 호출 여부, 데이터 소스) 반환
@@ -124,4 +129,8 @@ Phase 3 핵심 모듈을 추가했습니다.
 
 구현 모듈:
 - `src/m7_bottomfinder/runtime.py`
+- `src/m7_bottomfinder/app.py`
+- `src/m7_bottomfinder/run.py`
+- `deploy/m7-bottomfinder.service`
 - `tests/test_runtime.py`
+- `tests/test_app.py`

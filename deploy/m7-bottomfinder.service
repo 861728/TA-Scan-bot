@@ -1,0 +1,14 @@
+[Unit]
+Description=M7 BottomFinder Scanner Service
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/m7-bottomfinder
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/m7-bottomfinder/.venv/bin/python -m m7_bottomfinder.run
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

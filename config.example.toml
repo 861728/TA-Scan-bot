@@ -1,41 +1,18 @@
-# M7-BottomFinder baseline config
+[runtime]
+symbols = ["AAPL", "MSFT", "GOOG", "AMZN", "NVDA", "META", "TSLA"]
+timeframe = "15m"
+interval_seconds = 600
+cache_dir = "data/cache"
 
-[m7]
-tickers = ["AAPL", "MSFT", "GOOG", "AMZN", "NVDA", "META", "TSLA"]
-
-[timeframe]
-main = "15m"
-htf_filter = ["1h", "1d"]
-
-[score]
-threshold = 5
+[scoring]
+score_threshold = 5
 ai_call_threshold = 6
-boost_delta_for_override = 3
+min_s_hits_for_ai = 2
 
-[weights]
-# S-grade
-wvf_spike = 3
-volume_capitulation_spike = 3
-obv_divergence = 3
-# A-grade examples
-mfi = 1
-cmf = 1
-triple_stoch_rsi = 1
-macd_divergence = 1
-
-[alert]
+[alerts]
 cooldown_minutes = 120
-allow_premarket = true
-allow_regular = true
+strengthen_delta = 3
 
-[ai_limit]
-max_calls_per_symbol_per_day = 3
-max_calls_total_per_day = 20
-
-[backtest]
-lookback_months = 12
-precision_rebound_days = 5
-precision_rebound_threshold_pct = 3.0
-target_precision_pct = 70.0
-target_mdd_pct = -5.0
-target_avg_rebound_pct = 5.0
+[ai]
+per_symbol_daily = 3
+global_daily = 20
