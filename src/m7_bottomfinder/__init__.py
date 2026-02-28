@@ -1,5 +1,6 @@
 """M7 BottomFinder package."""
 
+from .backtest import BacktestReport, BacktestSignal, BacktestSimulator, BacktestTradeResult, extract_active_results, summarize_kpi
 from .data_layer import Bar, CacheMetadata, DataCache, DataLayer, normalize_timestamp
 from .divergence import DivergenceDetector, DivergenceSignal, DivergenceType, Pivot
 from .indicator_engine import BaseIndicator, Indicator, IndicatorEngine, IndicatorResult, SignalDirection, SignalSummary
@@ -58,4 +59,10 @@ __all__ = [
     "KsReversalIndicator",
     "MACDDivergenceIndicator",
     "default_phase2_indicators",
+    "BacktestSignal",
+    "BacktestTradeResult",
+    "BacktestReport",
+    "BacktestSimulator",
+    "summarize_kpi",
+    "extract_active_results",
 ]

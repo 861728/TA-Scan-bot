@@ -81,3 +81,17 @@ Phase 2 개발을 위해 지표 공통 인터페이스와 재사용 가능한 �
 - `src/m7_bottomfinder/divergence.py`
 - `src/m7_bottomfinder/indicators.py`
 - `tests/test_phase2_indicators.py`
+
+
+## Step 1.5 구현 상태 (백테스트 시뮬레이터 + KPI 산출)
+
+Phase 1.5 요구사항에 맞춰 과거 바 데이터 기반 시뮬레이터를 추가했습니다.
+
+- `BacktestSimulator`: 바 단위로 지표 엔진을 재평가해 가상 알람 시점 생성
+- 쿨타임/강화 신호 반영: `cooldown_bars`, `strengthen_delta`
+- KPI 산출: Precision, Avg Rebound, Max Drawdown, Signal Duration, Signal-to-Noise Ratio, Time to Recovery
+- `summarize_kpi`: 리포트 직렬화용 요약 dict 제공
+
+구현 모듈:
+- `src/m7_bottomfinder/backtest.py`
+- `tests/test_backtest_simulator.py`
