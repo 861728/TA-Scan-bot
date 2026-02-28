@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime
 import json
+from urllib import request as _urllib_request
 from typing import Protocol
 
 from .alert_engine import AlertDecision
@@ -52,6 +53,45 @@ class AIUsageLimiter:
         day = normalize_timestamp(now).date()
         self._sym[(symbol, day)] = self._sym.get((symbol, day), 0) + 1
         self._global[day] = self._global.get(day, 0) + 1
+
+
+class ClaudeProvider:
+    """Anthropic Claude provider via Messages API (stdlib only, no SDK needed)."""
+
+    name = "claude"
+    _API_URL = "https://api.anthropic.com/v1/messages"
+    _MODEL = "claude-sonnet-4-6"
+    _SYSTEM = (
+        "You are a quantitative trading signal interpreter. "
+        "Given numeric indicator data, return ONLY a JSON object with keys: "
+        "regime (string), confidence (int 0-100), summary (string, Korean), risks (list of ≤3 Korean strings). "
+        "No markdown, no explanation — pure JSON only."
+    )
+
+    def __init__(self, api_key: str, timeout: int = 20) -> None:
+        self._api_key = api_key
+        self._timeout = timeout
+
+    def generate(self, prompt: str) -> str:
+        body = json.dumps({
+            "model": self._MODEL,
+            "max_tokens": 256,
+            "system": self._SYSTEM,
+            "messages": [{"role": "user", "content": prompt}],
+        }).encode()
+        req = _urllib_request.Request(
+            self._API_URL,
+            data=body,
+            headers={
+                "content-type": "application/json",
+                "x-api-key": self._api_key,
+                "anthropic-version": "2023-06-01",
+            },
+            method="POST",
+        )
+        with _urllib_request.urlopen(req, timeout=self._timeout) as resp:
+            payload = json.loads(resp.read())
+        return payload["content"][0]["text"]
 
 
 class RuleBasedProvider:

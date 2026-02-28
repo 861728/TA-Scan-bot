@@ -40,6 +40,7 @@ allow_regular = true
 [ai]
 per_symbol_daily = 3
 global_daily = 20
+anthropic_api_key = ""   # sk-ant-... 입력 시 Claude 자동 활성화, 빈 칸이면 규칙 기반 fallback
 
 [backtest]
 lookback_months = 12
