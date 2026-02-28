@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 import ast
+import os
 import time
 from typing import Callable
 
@@ -58,7 +59,7 @@ class ScanAppConfig:
             ai_global_daily=int(ai.get("global_daily", 20)),
             telegram_bot_token=_none_if_blank(telegram.get("bot_token")),
             telegram_chat_id=_none_if_blank(telegram.get("chat_id")),
-            anthropic_api_key=_none_if_blank(ai.get("anthropic_api_key")),
+            anthropic_api_key=_none_if_blank(ai.get("anthropic_api_key")) or _none_if_blank(os.environ.get("ANTHROPIC_API_KEY")),
         )
 
 
