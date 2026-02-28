@@ -9,6 +9,7 @@ from .alert_engine import AlertAction, AlertDecision, AlertEngine
 from .data_layer import Bar, DataCache, DataLayer, normalize_timestamp
 from .indicator_engine import IndicatorEngine, IndicatorResult, SignalSummary
 from .monitoring import RuntimeMetrics
+from .providers import KRWConverter
 from .recovery import FetchRecovery
 
 
@@ -48,6 +49,7 @@ class ScannerRuntime:
         ai_interpreter: AIInterpreter,
         notifier: Notifier,
         metrics: RuntimeMetrics | None = None,
+        krw_converter: KRWConverter | None = None,
     ) -> None:
         self.cache = cache
         self.data_layer = data_layer
@@ -57,6 +59,7 @@ class ScannerRuntime:
         self.ai_interpreter = ai_interpreter
         self.notifier = notifier
         self.metrics = metrics
+        self.krw_converter = krw_converter
 
     def run_cycle(
         self,
@@ -88,7 +91,9 @@ class ScannerRuntime:
         )
 
         if decision.should_send:
-            message = self._build_alert_text(config, summary, decision, ai.result.summary if ai.result else None)
+            last_price = cached_bars[-1].close if cached_bars else None
+            krw_price = self.krw_converter.convert(last_price) if (self.krw_converter and last_price) else None
+            message = self._build_alert_text(config, summary, decision, ai.result.summary if ai.result else None, last_price, krw_price)
             self.notifier.send(message)
 
         if self.metrics is not None:
@@ -114,13 +119,18 @@ class ScannerRuntime:
         summary: SignalSummary,
         decision: AlertDecision,
         ai_summary: str | None,
+        last_price: float | None = None,
+        krw_price: float | None = None,
     ) -> str:
-        base = (
-            f"[{config.symbol}/{config.timeframe}] action={decision.action.value} "
-            f"score={summary.total_score} direction={summary.strongest_signal.value}"
-        )
+        lines = [f"[M7 바닥 스캐너] {config.symbol} / {config.timeframe}"]
+        if last_price is not None:
+            price_str = f"현재가: ${last_price:,.2f}"
+            if krw_price is not None:
+                price_str += f" (₩{krw_price:,.0f})"
+            lines.append(price_str)
+        lines.append(f"신호 점수: {summary.total_score}점  방향: {summary.strongest_signal.value}")
         if decision.action == AlertAction.SEND_STRENGTHENED:
-            base += " (strengthened)"
+            lines.append("※ 신호 강화 (이전 대비 점수 상승)")
         if ai_summary:
-            base += f"\nAI: {ai_summary}"
-        return base
+            lines.append(f"\nAI 해석: {ai_summary}")
+        return "\n".join(lines)

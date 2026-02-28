@@ -74,7 +74,7 @@ def test_runtime_cycle_sends_alert_and_ai_summary(tmp_path) -> None:
     assert result.alert_decision.action in {AlertAction.SEND, AlertAction.SEND_STRENGTHENED}
     assert result.ai_called is True
     assert len(notifier.messages) == 1
-    assert "AI:" in notifier.messages[0]
+    assert "AI 해석:" in notifier.messages[0]
 
 
 def test_runtime_cycle_uses_cache_fallback(tmp_path) -> None:
