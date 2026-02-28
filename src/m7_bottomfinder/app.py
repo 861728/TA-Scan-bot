@@ -7,7 +7,7 @@ import ast
 import time
 from typing import Callable
 
-from .ai_layer import AIInterpreter, AIUsageLimiter, RuleBasedProvider
+from .ai_layer import AIInterpreter, AIUsageLimiter, ClaudeProvider, RuleBasedProvider
 from .alert_engine import AlertEngine
 from .data_layer import Bar, DataCache, DataLayer
 from .indicator_engine import IndicatorEngine
@@ -32,6 +32,7 @@ class ScanAppConfig:
     ai_global_daily: int
     telegram_bot_token: str | None
     telegram_chat_id: str | None
+    anthropic_api_key: str | None = None
 
     @staticmethod
     def from_toml(path: str | Path) -> "ScanAppConfig":
@@ -57,6 +58,7 @@ class ScanAppConfig:
             ai_global_daily=int(ai.get("global_daily", 20)),
             telegram_bot_token=_none_if_blank(telegram.get("bot_token")),
             telegram_chat_id=_none_if_blank(telegram.get("chat_id")),
+            anthropic_api_key=_none_if_blank(ai.get("anthropic_api_key")),
         )
 
 
@@ -132,7 +134,7 @@ class ScanApplication:
                 strengthened_delta=config.strengthen_delta,
             ),
             ai_interpreter=AIInterpreter(
-                provider=RuleBasedProvider(),
+                provider=ClaudeProvider(config.anthropic_api_key) if config.anthropic_api_key else RuleBasedProvider(),
                 limiter=AIUsageLimiter(
                     per_symbol=config.ai_per_symbol_daily,
                     global_daily=config.ai_global_daily,
