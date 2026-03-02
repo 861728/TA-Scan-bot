@@ -64,8 +64,16 @@ class BaseIndicator:
 
 
 @dataclass(frozen=True)
+class IndicatorGroup:
+    name: str
+    members: frozenset[str]
+    cap: int
+
+
+@dataclass(frozen=True)
 class SignalSummary:
     total_score: int
+    grouped_score: int
     strongest_signal: SignalDirection
     bullish_count: int
     bearish_count: int
@@ -73,6 +81,7 @@ class SignalSummary:
     should_alert: bool
     should_call_ai: bool
     s_tier_hits: int
+    volume_ok: bool = True
 
 
 class IndicatorEngine:
@@ -83,19 +92,22 @@ class IndicatorEngine:
         ai_call_threshold: int = 6,
         min_s_hits_for_ai: int = 2,
         s_tier_names: set[str] | None = None,
+        groups: list[IndicatorGroup] | None = None,
+        min_volume_multiple: float = 1.5,
     ) -> None:
         self.indicators = indicators
         self.score_threshold = score_threshold
         self.ai_call_threshold = ai_call_threshold
         self.min_s_hits_for_ai = min_s_hits_for_ai
         self.s_tier_names = s_tier_names or set()
+        self.groups = groups or []
+        self.min_volume_multiple = min_volume_multiple
 
     def run(self, bars: list[Bar]) -> tuple[list[IndicatorResult], SignalSummary]:
         results = [indicator.evaluate(bars) for indicator in self.indicators]
         bullish = sum(1 for r in results if r.signal == SignalDirection.BULLISH)
         bearish = sum(1 for r in results if r.signal == SignalDirection.BEARISH)
         neutral = len(results) - bullish - bearish
-        total_score = sum(r.score for r in results)
 
         strongest = SignalDirection.NEUTRAL
         if bullish > bearish:
@@ -104,14 +116,42 @@ class IndicatorEngine:
             strongest = SignalDirection.BEARISH
 
         s_hits = sum(1 for r in results if r.indicator in self.s_tier_names and r.score > 0)
+
+        # --- Grouped scoring ---
+        score_by_indicator: dict[str, int] = {r.indicator: r.score for r in results}
+        grouped_members: set[str] = set()
+        grouped_score = 0
+
+        for group in self.groups:
+            raw = sum(score_by_indicator.get(m, 0) for m in group.members)
+            grouped_score += min(raw, group.cap)
+            grouped_members |= group.members
+
+        for r in results:
+            if r.indicator not in grouped_members:
+                grouped_score += r.score
+
+        # --- Volume filter ---
+        vol_result = next(
+            (r for r in results if r.indicator == "volume_capitulation"), None
+        )
+        volume_ok = True
+        if vol_result is not None and self.min_volume_multiple > 0:
+            vol = vol_result.raw_values.get("volume", 0.0)
+            avg = vol_result.raw_values.get("avg", 0.0)
+            if avg and float(avg) > 0:
+                volume_ok = float(vol) >= self.min_volume_multiple * float(avg)
+
         summary = SignalSummary(
-            total_score=total_score,
+            total_score=sum(r.score for r in results),
+            grouped_score=grouped_score,
             strongest_signal=strongest,
             bullish_count=bullish,
             bearish_count=bearish,
             neutral_count=neutral,
-            should_alert=total_score >= self.score_threshold,
-            should_call_ai=(total_score >= self.ai_call_threshold or s_hits >= self.min_s_hits_for_ai),
+            should_alert=(grouped_score >= self.score_threshold) and volume_ok,
+            should_call_ai=(grouped_score >= self.ai_call_threshold or s_hits >= self.min_s_hits_for_ai),
             s_tier_hits=s_hits,
+            volume_ok=volume_ok,
         )
         return results, summary

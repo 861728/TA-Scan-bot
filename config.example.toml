@@ -9,6 +9,7 @@ cache_dir = "data/cache"
 score_threshold = 5
 ai_call_threshold = 6
 min_s_hits_for_ai = 2
+min_volume_multiple = 1.5   # 거래량이 20봉 평균 대비 최소 이 배수 이상이어야 알림 발송 (0 = 비활성화)
 
 [weights]
 # S-grade (3pts each)

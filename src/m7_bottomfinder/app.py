@@ -11,7 +11,7 @@ from typing import Callable
 from .ai_layer import AIInterpreter, AIUsageLimiter, ClaudeProvider, RuleBasedProvider
 from .alert_engine import AlertEngine
 from .data_layer import Bar, DataCache, DataLayer
-from .indicator_engine import IndicatorEngine
+from .indicator_engine import IndicatorEngine, IndicatorGroup
 from .indicators import default_phase2_indicators
 from .monitoring import RuntimeMetrics, RuntimeSnapshot
 from .providers import KRWConverter
@@ -35,6 +35,7 @@ class ScanAppConfig:
     telegram_bot_token: str | None
     telegram_chat_id: str | None
     anthropic_api_key: str | None = None
+    min_volume_multiple: float = 1.5
 
     @staticmethod
     def from_toml(path: str | Path) -> "ScanAppConfig":
@@ -61,6 +62,7 @@ class ScanAppConfig:
             telegram_bot_token=_none_if_blank(telegram.get("bot_token")),
             telegram_chat_id=_none_if_blank(telegram.get("chat_id")),
             anthropic_api_key=_none_if_blank(ai.get("anthropic_api_key")) or _none_if_blank(os.environ.get("ANTHROPIC_API_KEY")),
+            min_volume_multiple=float(scoring.get("min_volume_multiple", 1.5)),
         )
 
 
@@ -130,6 +132,24 @@ class ScanApplication:
                 ai_call_threshold=config.ai_call_threshold,
                 min_s_hits_for_ai=config.min_s_hits_for_ai,
                 s_tier_names={"wvf_spike", "volume_capitulation", "obv_divergence"},
+                min_volume_multiple=config.min_volume_multiple,
+                groups=[
+                    IndicatorGroup("oversold_momentum",
+                        frozenset({"triple_stoch_rsi", "composite_oscillator", "rsi_sma200", "bb_stochastic", "ks_reversal"}),
+                        cap=2),
+                    IndicatorGroup("money_flow",
+                        frozenset({"mfi", "cmf", "adline_divergence", "nvi_pvi"}),
+                        cap=2),
+                    IndicatorGroup("divergence",
+                        frozenset({"macd_divergence", "obv_divergence", "macd_obv_divergence"}),
+                        cap=4),
+                    IndicatorGroup("volume_structure",
+                        frozenset({"volume_capitulation", "vpt", "wvf_spike"}),
+                        cap=5),
+                    IndicatorGroup("trend_structure",
+                        frozenset({"ichimoku_rsi_obv", "fibonacci_618_support"}),
+                        cap=2),
+                ],
             ),
             alert_engine=AlertEngine(
                 cooldown_minutes=config.cooldown_minutes,
