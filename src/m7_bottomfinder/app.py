@@ -36,6 +36,7 @@ class ScanAppConfig:
     telegram_chat_id: str | None
     anthropic_api_key: str | None = None
     min_volume_multiple: float = 1.5
+    fetch_delay_seconds: float = 0.5
 
     @staticmethod
     def from_toml(path: str | Path) -> "ScanAppConfig":
@@ -63,6 +64,7 @@ class ScanAppConfig:
             telegram_chat_id=_none_if_blank(telegram.get("chat_id")),
             anthropic_api_key=_none_if_blank(ai.get("anthropic_api_key")) or _none_if_blank(os.environ.get("ANTHROPIC_API_KEY")),
             min_volume_multiple=float(scoring.get("min_volume_multiple", 1.5)),
+            fetch_delay_seconds=float(runtime.get("fetch_delay_seconds", 0.5)),
         )
 
 
@@ -169,12 +171,14 @@ class ScanApplication:
 
     def run_once(self, fetcher: Callable[[str, str], list[Bar]]) -> None:
         now = datetime.utcnow()
-        for symbol in self.config.symbols:
+        for i, symbol in enumerate(self.config.symbols):
             self.runtime.run_cycle(
                 config=ScanRuntimeConfig(symbol=symbol, timeframe=self.config.timeframe),
                 fetcher=fetcher,
                 now=now,
             )
+            if i < len(self.config.symbols) - 1:
+                time.sleep(self.config.fetch_delay_seconds)
 
     def run_forever(self, fetcher: Callable[[str, str], list[Bar]]) -> None:
         while True:
