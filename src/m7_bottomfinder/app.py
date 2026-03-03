@@ -189,6 +189,7 @@ class ScanApplication:
     def run_once(self, fetcher: Callable[[str, str], list[Bar]]) -> None:
         now = datetime.utcnow()
         alerts_sent = 0
+        weak_signals: list[tuple[str, int, str]] = []
         for i, symbol in enumerate(self.config.symbols):
             result = self.runtime.run_cycle(
                 config=ScanRuntimeConfig(symbol=symbol, timeframe=self.config.timeframe),
@@ -197,11 +198,21 @@ class ScanApplication:
             )
             if result.alert_decision.should_send:
                 alerts_sent += 1
+            elif result.summary.grouped_score >= 1 and not result.summary.should_alert:
+                weak_signals.append((
+                    symbol,
+                    result.summary.grouped_score,
+                    result.summary.strongest_signal.name,
+                ))
             if i < len(self.config.symbols) - 1:
                 time.sleep(self.config.fetch_delay_seconds)
-        self._maybe_send_heartbeat(now, alerts_sent)
+        self._maybe_send_heartbeat(now, alerts_sent, weak_signals)
 
-    def _maybe_send_heartbeat(self, utc_now: datetime, alerts_sent: int) -> None:
+    _DIR_KR = {"BULLISH": "매수", "BEARISH": "매도", "NEUTRAL": "중립"}
+
+    def _maybe_send_heartbeat(
+        self, utc_now: datetime, alerts_sent: int, weak_signals: list[tuple[str, int, str]]
+    ) -> None:
         if not _is_us_market_hours(utc_now):
             return
         today_et = utc_now.astimezone(_ET).date()
@@ -214,6 +225,13 @@ class ScanApplication:
                 f"{len(self.config.symbols)}개 종목 이상 없음"
             )
             self.notifier.send(msg)
+        if weak_signals:
+            sorted_ws = sorted(weak_signals, key=lambda x: x[1], reverse=True)
+            lines = [f"[M7 바닥 스캐너] 약신호 종목 ({len(sorted_ws)}개)"]
+            for sym, score, dir_name in sorted_ws:
+                dir_kr = self._DIR_KR.get(dir_name, dir_name)
+                lines.append(f"{sym}  {dir_kr}  {score}점")
+            self.notifier.send("\n".join(lines))
 
     def run_forever(self, fetcher: Callable[[str, str], list[Bar]]) -> None:
         while True:
