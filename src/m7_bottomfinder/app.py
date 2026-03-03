@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime, time as dtime
 from pathlib import Path
 import ast
 import os
 import time
 from typing import Callable
+
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    from backports.zoneinfo import ZoneInfo  # type: ignore[no-redef]
 
 from .ai_layer import AIInterpreter, AIUsageLimiter, ClaudeProvider, RuleBasedProvider
 from .alert_engine import AlertEngine
@@ -68,6 +73,17 @@ class ScanAppConfig:
         )
 
 
+_ET = ZoneInfo("America/New_York")
+
+
+def _is_us_market_hours(utc_now: datetime) -> bool:
+    et = utc_now.astimezone(_ET)
+    if et.weekday() >= 5:
+        return False
+    t = et.time()
+    return dtime(9, 30) <= t < dtime(16, 0)
+
+
 def _none_if_blank(value: object) -> str | None:
     if value is None:
         return None
@@ -120,6 +136,7 @@ class ScanApplication:
     def __init__(self, config: ScanAppConfig, notifier: Notifier | None = None) -> None:
         self.config = config
         self.notifier = notifier or ConsoleNotifier()
+        self._heartbeat_date: date | None = None
 
         self.metrics = RuntimeMetrics()
 
@@ -171,20 +188,37 @@ class ScanApplication:
 
     def run_once(self, fetcher: Callable[[str, str], list[Bar]]) -> None:
         now = datetime.utcnow()
+        alerts_sent = 0
         for i, symbol in enumerate(self.config.symbols):
-            self.runtime.run_cycle(
+            result = self.runtime.run_cycle(
                 config=ScanRuntimeConfig(symbol=symbol, timeframe=self.config.timeframe),
                 fetcher=fetcher,
                 now=now,
             )
+            if result.alert_decision.should_send:
+                alerts_sent += 1
             if i < len(self.config.symbols) - 1:
                 time.sleep(self.config.fetch_delay_seconds)
+        self._maybe_send_heartbeat(now, alerts_sent)
+
+    def _maybe_send_heartbeat(self, utc_now: datetime, alerts_sent: int) -> None:
+        if not _is_us_market_hours(utc_now):
+            return
+        today_et = utc_now.astimezone(_ET).date()
+        if self._heartbeat_date == today_et:
+            return
+        self._heartbeat_date = today_et
+        if alerts_sent == 0:
+            msg = (
+                f"[M7 바닥 스캐너] 개장 스캔 완료\n"
+                f"{len(self.config.symbols)}개 종목 이상 없음"
+            )
+            self.notifier.send(msg)
 
     def run_forever(self, fetcher: Callable[[str, str], list[Bar]]) -> None:
         while True:
             self.run_once(fetcher)
             time.sleep(self.config.interval_seconds)
-
 
     def get_metrics_snapshot(self) -> RuntimeSnapshot:
         return self.metrics.snapshot()
