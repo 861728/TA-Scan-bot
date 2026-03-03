@@ -93,7 +93,7 @@ class ScannerRuntime:
         if decision.should_send:
             last_price = cached_bars[-1].close if cached_bars else None
             krw_price = self.krw_converter.convert(last_price) if (self.krw_converter and last_price) else None
-            message = self._build_alert_text(config, summary, decision, ai.result.summary if ai.result else None, last_price, krw_price)
+            message = self._build_alert_text(config, summary, decision, results, ai.result.summary if ai.result else None, last_price, krw_price)
             self.notifier.send(message)
 
         if self.metrics is not None:
@@ -113,11 +113,33 @@ class ScannerRuntime:
             data_source=recovered.source,
         )
 
+    # indicator name → (한국어 표시명, tier)
+    _INDICATOR_META: dict[str, tuple[str, str]] = {
+        "wvf_spike":            ("WVF 급등",            "S"),
+        "volume_capitulation":  ("거래량 공황 소진",    "S"),
+        "obv_divergence":       ("OBV 다이버전스",      "S"),
+        "mfi":                  ("MFI 과매도",          "A"),
+        "cmf":                  ("CMF 자금유입",        "A"),
+        "triple_stoch_rsi":     ("삼중 스토캐스틱RSI",  "A"),
+        "adline_divergence":    ("A/D 다이버전스",      "A"),
+        "composite_oscillator": ("복합 오실레이터",     "A"),
+        "vpt":                  ("VPT 반전",            "A"),
+        "nvi_pvi":              ("NVI/PVI",             "A"),
+        "rsi_sma200":           ("RSI+SMA200",          "A"),
+        "bb_stochastic":        ("BB+스토캐스틱",       "A"),
+        "macd_obv_divergence":  ("MACD+OBV 다이버전스","A"),
+        "fibonacci_618_support":("피보나치 61.8%",      "A"),
+        "ichimoku_rsi_obv":     ("이치모쿠+RSI+OBV",   "A"),
+        "ks_reversal":          ("K's 반전",            "A"),
+        "macd_divergence":      ("MACD 다이버전스",     "A"),
+    }
+
     @staticmethod
     def _build_alert_text(
         config: ScanRuntimeConfig,
         summary: SignalSummary,
         decision: AlertDecision,
+        results: list[IndicatorResult],
         ai_summary: str | None,
         last_price: float | None = None,
         krw_price: float | None = None,
@@ -131,6 +153,26 @@ class ScannerRuntime:
         lines.append(f"신호 점수: {summary.total_score}점  방향: {summary.strongest_signal.value}")
         if decision.action == AlertAction.SEND_STRENGTHENED:
             lines.append("※ 신호 강화 (이전 대비 점수 상승)")
+
+        # 지표별 발동 여부 표시
+        fired: dict[str, bool] = {r.indicator: r.score > 0 for r in results}
+        meta = ScannerRuntime._INDICATOR_META
+
+        lines.append("")
+        lines.append("🔴 S티어 (각 3점)")
+        for key, (label, tier) in meta.items():
+            if tier != "S":
+                continue
+            mark = "✅" if fired.get(key, False) else "❌"
+            lines.append(f"  {mark} {label}")
+
+        lines.append("🟡 A티어 (각 1점)")
+        for key, (label, tier) in meta.items():
+            if tier != "A":
+                continue
+            mark = "✅" if fired.get(key, False) else "❌"
+            lines.append(f"  {mark} {label}")
+
         if ai_summary:
             lines.append(f"\nAI 해석: {ai_summary}")
         return "\n".join(lines)
