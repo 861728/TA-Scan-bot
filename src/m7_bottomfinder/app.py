@@ -221,13 +221,13 @@ class ScanApplication:
         self._heartbeat_date = today_et
         if alerts_sent == 0:
             msg = (
-                f"[M7 바닥 스캐너] 개장 스캔 완료\n"
+                f"[S&P100 바닥잡기] 개장 스캔 완료\n"
                 f"{len(self.config.symbols)}개 종목 이상 없음"
             )
             self.notifier.send(msg)
         if weak_signals:
             sorted_ws = sorted(weak_signals, key=lambda x: x[1], reverse=True)
-            lines = [f"[M7 바닥 스캐너] 약신호 종목 ({len(sorted_ws)}개)"]
+            lines = [f"[S&P100 바닥잡기] 약신호 종목 ({len(sorted_ws)}개)"]
             for sym, score, dir_name in sorted_ws:
                 dir_kr = self._DIR_KR.get(dir_name, dir_name)
                 lines.append(f"{sym}  {dir_kr}  {score}점")
