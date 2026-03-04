@@ -50,6 +50,16 @@ class YahooFinanceFetcher:
         self.lookback_period = lookback_period
         self.loader = loader
 
+    def _effective_period(self, interval: str) -> str:
+        """Yahoo Finance caps sub-daily historical data to shorter windows."""
+        if interval == "1m":
+            return "7d"
+        if interval in ("5m", "15m", "30m"):
+            return "59d"
+        if interval in ("60m", "90m"):
+            return "700d"
+        return self.lookback_period
+
     def __call__(self, symbol: str, timeframe: str) -> list[Bar]:
         try:
             if self.loader is not None:
@@ -59,7 +69,7 @@ class YahooFinanceFetcher:
             import yfinance as yf  # optional runtime dependency
 
             interval = self._map_timeframe(timeframe)
-            hist = yf.Ticker(symbol).history(period=self.lookback_period, interval=interval)
+            hist = yf.Ticker(symbol).history(period=self._effective_period(interval), interval=interval)
             bars: list[Bar] = []
             for idx, row in hist.iterrows():
                 bars.append(
