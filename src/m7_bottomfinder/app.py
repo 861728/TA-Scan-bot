@@ -19,9 +19,10 @@ from .data_layer import Bar, DataCache, DataLayer
 from .indicator_engine import IndicatorEngine, IndicatorGroup
 from .indicators import default_phase2_indicators
 from .monitoring import RuntimeMetrics, RuntimeSnapshot
+from .notifiers import CsvLogger
 from .providers import KRWConverter
 from .recovery import FetchRecovery
-from .runtime import Notifier, ScanRuntimeConfig, ScannerRuntime
+from .runtime import Notifier, ScanRuntimeConfig, ScannerRuntime, _INDICATOR_META
 
 
 @dataclass(frozen=True)
@@ -40,8 +41,10 @@ class ScanAppConfig:
     telegram_bot_token: str | None
     telegram_chat_id: str | None
     anthropic_api_key: str | None = None
-    min_volume_multiple: float = 1.5
+    min_volume_multiple: float = 1.0
     fetch_delay_seconds: float = 0.5
+    max_daily_alerts: int = 5
+    csv_log_path: str | None = None
 
     @staticmethod
     def from_toml(path: str | Path) -> "ScanAppConfig":
@@ -59,7 +62,7 @@ class ScanAppConfig:
             interval_seconds=int(runtime.get("interval_seconds", 600)),
             cache_dir=str(runtime.get("cache_dir", "data/cache")),
             score_threshold=int(scoring.get("score_threshold", 5)),
-            ai_call_threshold=int(scoring.get("ai_call_threshold", 6)),
+            ai_call_threshold=int(scoring.get("ai_call_threshold", 7)),
             min_s_hits_for_ai=int(scoring.get("min_s_hits_for_ai", 2)),
             cooldown_minutes=int(alerts.get("cooldown_minutes", 120)),
             strengthen_delta=int(alerts.get("strengthen_delta", 3)),
@@ -68,8 +71,10 @@ class ScanAppConfig:
             telegram_bot_token=_none_if_blank(telegram.get("bot_token")),
             telegram_chat_id=_none_if_blank(telegram.get("chat_id")),
             anthropic_api_key=_none_if_blank(ai.get("anthropic_api_key")) or _none_if_blank(os.environ.get("ANTHROPIC_API_KEY")),
-            min_volume_multiple=float(scoring.get("min_volume_multiple", 1.5)),
+            min_volume_multiple=float(scoring.get("min_volume_multiple", 1.0)),
             fetch_delay_seconds=float(runtime.get("fetch_delay_seconds", 0.5)),
+            max_daily_alerts=int(alerts.get("max_daily_alerts", 5)),
+            csv_log_path=_none_if_blank(runtime.get("csv_log_path")),
         )
 
 
@@ -132,10 +137,34 @@ class ConsoleNotifier:
         print(text)
 
 
+class _DailyCapNotifier:
+    """강신호 알림을 하루 max_daily개로 제한한다. 하트비트/약신호는 별도 notifier 사용."""
+
+    def __init__(self, inner: Notifier, max_daily: int) -> None:
+        self._inner = inner
+        self._max = max_daily
+        self._date: date | None = None
+        self._count: int = 0
+
+    def _refresh(self, today: date) -> None:
+        if self._date != today:
+            self._date = today
+            self._count = 0
+
+    def send(self, text: str) -> None:
+        today = datetime.utcnow().astimezone(_ET).date()
+        self._refresh(today)
+        if self._count < self._max:
+            self._inner.send(text)
+            self._count += 1
+
+
 class ScanApplication:
     def __init__(self, config: ScanAppConfig, notifier: Notifier | None = None) -> None:
         self.config = config
         self.notifier = notifier or ConsoleNotifier()
+        self._alert_notifier = _DailyCapNotifier(self.notifier, config.max_daily_alerts)
+        self._csv_logger = CsvLogger(config.csv_log_path) if config.csv_log_path else None
         self._heartbeat_date: date | None = None
 
         self.metrics = RuntimeMetrics()
@@ -181,7 +210,7 @@ class ScanApplication:
                     global_daily=config.ai_global_daily,
                 ),
             ),
-            notifier=self.notifier,
+            notifier=self._alert_notifier,
             metrics=self.metrics,
             krw_converter=KRWConverter(),
         )
@@ -189,7 +218,7 @@ class ScanApplication:
     def run_once(self, fetcher: Callable[[str, str], list[Bar]]) -> None:
         now = datetime.utcnow()
         alerts_sent = 0
-        weak_signals: list[tuple[str, int, str]] = []
+        weak_signals: list[tuple[str, int, str, tuple[str, ...]]] = []
         for i, symbol in enumerate(self.config.symbols):
             result = self.runtime.run_cycle(
                 config=ScanRuntimeConfig(symbol=symbol, timeframe=self.config.timeframe),
@@ -198,11 +227,19 @@ class ScanApplication:
             )
             if result.alert_decision.should_send:
                 alerts_sent += 1
+                if self._csv_logger is not None:
+                    kr_names = ", ".join(
+                        _INDICATOR_META[n][0]
+                        for n in result.summary.triggered_indicators
+                        if n in _INDICATOR_META
+                    )
+                    self._csv_logger.log(symbol, result.timestamp, result.summary.grouped_score, kr_names)
             elif result.summary.grouped_score >= 1 and not result.summary.should_alert:
                 weak_signals.append((
                     symbol,
                     result.summary.grouped_score,
                     result.summary.strongest_signal.name,
+                    result.summary.triggered_indicators,
                 ))
             if i < len(self.config.symbols) - 1:
                 time.sleep(self.config.fetch_delay_seconds)
@@ -211,7 +248,7 @@ class ScanApplication:
     _DIR_KR = {"BULLISH": "매수", "BEARISH": "매도", "NEUTRAL": "중립"}
 
     def _maybe_send_heartbeat(
-        self, utc_now: datetime, alerts_sent: int, weak_signals: list[tuple[str, int, str]]
+        self, utc_now: datetime, alerts_sent: int, weak_signals: list[tuple[str, int, str, tuple[str, ...]]]
     ) -> None:
         if not _is_us_market_hours(utc_now):
             return
@@ -228,9 +265,13 @@ class ScanApplication:
         if weak_signals:
             sorted_ws = sorted(weak_signals, key=lambda x: x[1], reverse=True)
             lines = [f"[S&P100 바닥잡기] 약신호 종목 ({len(sorted_ws)}개)"]
-            for sym, score, dir_name in sorted_ws:
+            for sym, score, dir_name, triggered in sorted_ws:
                 dir_kr = self._DIR_KR.get(dir_name, dir_name)
-                lines.append(f"{sym}  {dir_kr}  {score}점")
+                kr_names = ", ".join(
+                    _INDICATOR_META[n][0] for n in triggered if n in _INDICATOR_META
+                )
+                suffix = f"  |  {kr_names}" if kr_names else ""
+                lines.append(f"{sym}  {dir_kr}  {score}점{suffix}")
             self.notifier.send("\n".join(lines))
 
     def run_forever(self, fetcher: Callable[[str, str], list[Bar]]) -> None:

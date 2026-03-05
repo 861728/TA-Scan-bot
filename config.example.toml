@@ -17,12 +17,13 @@ htf_filter = ["1h", "1d"]
 interval_seconds = 1800   # 100개 종목 → 30분 간격 권장
 fetch_delay_seconds = 0.5  # 종목 간 레이트리밋 방지 딜레이 (초)
 cache_dir = "data/cache"
+# csv_log_path = "alerts.csv"  # 강신호 알림 CSV 로그 경로 (주석 해제하면 활성화)
 
 [scoring]
 score_threshold = 5
-ai_call_threshold = 6
+ai_call_threshold = 7        # 급락장 AI 호출 폭주 방지 (기존 6 → 7)
 min_s_hits_for_ai = 2
-min_volume_multiple = 1.5   # 거래량이 20봉 평균 대비 최소 이 배수 이상이어야 알림 발송 (0 = 비활성화)
+min_volume_multiple = 1.0   # 거래량이 20봉 평균 대비 최소 이 배수 이상이어야 알림 발송 (0 = 비활성화, 기존 1.5 → 1.0)
 
 [weights]
 # S-grade (3pts each)
@@ -50,6 +51,7 @@ cooldown_minutes = 120
 strengthen_delta = 3
 allow_premarket = true
 allow_regular = true
+max_daily_alerts = 5        # 하루 최대 강신호 알림 수
 
 [ai]
 per_symbol_daily = 3

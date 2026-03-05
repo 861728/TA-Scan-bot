@@ -82,6 +82,7 @@ class SignalSummary:
     should_call_ai: bool
     s_tier_hits: int
     volume_ok: bool = True
+    triggered_indicators: tuple[str, ...] = ()
 
 
 class IndicatorEngine:
@@ -89,11 +90,11 @@ class IndicatorEngine:
         self,
         indicators: list[Indicator],
         score_threshold: int = 5,
-        ai_call_threshold: int = 6,
+        ai_call_threshold: int = 7,
         min_s_hits_for_ai: int = 2,
         s_tier_names: set[str] | None = None,
         groups: list[IndicatorGroup] | None = None,
-        min_volume_multiple: float = 1.5,
+        min_volume_multiple: float = 1.0,
     ) -> None:
         self.indicators = indicators
         self.score_threshold = score_threshold
@@ -142,6 +143,11 @@ class IndicatorEngine:
             if avg and float(avg) > 0:
                 volume_ok = float(vol) >= self.min_volume_multiple * float(avg)
 
+        triggered = tuple(
+            r.indicator for r in results
+            if r.score > 0 and r.signal == SignalDirection.BULLISH
+        )
+
         summary = SignalSummary(
             total_score=sum(r.score for r in results),
             grouped_score=grouped_score,
@@ -153,5 +159,6 @@ class IndicatorEngine:
             should_call_ai=(grouped_score >= self.ai_call_threshold or s_hits >= self.min_s_hits_for_ai),
             s_tier_hits=s_hits,
             volume_ok=volume_ok,
+            triggered_indicators=triggered,
         )
         return results, summary

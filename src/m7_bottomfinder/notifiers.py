@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import csv
 import json
+import os
+from datetime import datetime as _dt
 from typing import Callable
 from urllib import parse, request
 
@@ -42,3 +45,24 @@ class SafeNotifier:
             self.inner.send(text)
         except Exception:
             print(json.dumps({"level": "warning", "message": "notifier failed"}))
+
+
+class CsvLogger:
+    """강신호 알림을 CSV에 기록한다."""
+
+    FIELDS = ["symbol", "timestamp", "grouped_score", "indicators"]
+
+    def __init__(self, path: str) -> None:
+        self.path = path
+        if not os.path.exists(path):
+            with open(path, "w", newline="", encoding="utf-8") as f:
+                csv.DictWriter(f, fieldnames=self.FIELDS).writeheader()
+
+    def log(self, symbol: str, ts: _dt, score: int, indicators: str) -> None:
+        with open(self.path, "a", newline="", encoding="utf-8") as f:
+            csv.DictWriter(f, fieldnames=self.FIELDS).writerow({
+                "symbol": symbol,
+                "timestamp": ts.strftime("%Y-%m-%d %H:%M"),
+                "grouped_score": score,
+                "indicators": indicators,
+            })

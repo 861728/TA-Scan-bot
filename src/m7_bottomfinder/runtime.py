@@ -36,6 +36,28 @@ class ScanCycleResult:
     data_source: str
 
 
+# indicator name → (한국어 표시명, tier)
+_INDICATOR_META: dict[str, tuple[str, str]] = {
+    "wvf_spike":            ("WVF 급등",            "S"),
+    "volume_capitulation":  ("거래량 공황 소진",    "S"),
+    "obv_divergence":       ("OBV 다이버전스",      "S"),
+    "mfi":                  ("MFI 과매도",          "A"),
+    "cmf":                  ("CMF 자금유입",        "A"),
+    "triple_stoch_rsi":     ("삼중 스토캐스틱RSI",  "A"),
+    "adline_divergence":    ("A/D 다이버전스",      "A"),
+    "composite_oscillator": ("복합 오실레이터",     "A"),
+    "vpt":                  ("VPT 반전",            "A"),
+    "nvi_pvi":              ("NVI/PVI",             "A"),
+    "rsi_sma200":           ("RSI+SMA200",          "A"),
+    "bb_stochastic":        ("BB+스토캐스틱",       "A"),
+    "macd_obv_divergence":  ("MACD+OBV 다이버전스","A"),
+    "fibonacci_618_support":("피보나치 61.8%",      "A"),
+    "ichimoku_rsi_obv":     ("이치모쿠+RSI+OBV",   "A"),
+    "ks_reversal":          ("K's 반전",            "A"),
+    "macd_divergence":      ("MACD 다이버전스",     "A"),
+}
+
+
 class ScannerRuntime:
     """Phase 4 runtime orchestrator for scan → alert → AI pipeline."""
 
@@ -113,26 +135,7 @@ class ScannerRuntime:
             data_source=recovered.source,
         )
 
-    # indicator name → (한국어 표시명, tier)
-    _INDICATOR_META: dict[str, tuple[str, str]] = {
-        "wvf_spike":            ("WVF 급등",            "S"),
-        "volume_capitulation":  ("거래량 공황 소진",    "S"),
-        "obv_divergence":       ("OBV 다이버전스",      "S"),
-        "mfi":                  ("MFI 과매도",          "A"),
-        "cmf":                  ("CMF 자금유입",        "A"),
-        "triple_stoch_rsi":     ("삼중 스토캐스틱RSI",  "A"),
-        "adline_divergence":    ("A/D 다이버전스",      "A"),
-        "composite_oscillator": ("복합 오실레이터",     "A"),
-        "vpt":                  ("VPT 반전",            "A"),
-        "nvi_pvi":              ("NVI/PVI",             "A"),
-        "rsi_sma200":           ("RSI+SMA200",          "A"),
-        "bb_stochastic":        ("BB+스토캐스틱",       "A"),
-        "macd_obv_divergence":  ("MACD+OBV 다이버전스","A"),
-        "fibonacci_618_support":("피보나치 61.8%",      "A"),
-        "ichimoku_rsi_obv":     ("이치모쿠+RSI+OBV",   "A"),
-        "ks_reversal":          ("K's 반전",            "A"),
-        "macd_divergence":      ("MACD 다이버전스",     "A"),
-    }
+    _INDICATOR_META = _INDICATOR_META  # 하위 호환: ScannerRuntime._INDICATOR_META 참조 유지
 
     @staticmethod
     def _build_alert_text(
