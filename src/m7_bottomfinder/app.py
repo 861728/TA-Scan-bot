@@ -8,6 +8,9 @@ import os
 import time
 from typing import Callable
 
+import pytz
+import schedule
+
 from .ai_layer import AIInterpreter, AIUsageLimiter, ClaudeProvider, RuleBasedProvider
 from .alert_engine import AlertEngine
 from .data_layer import Bar, DataCache, DataLayer
@@ -157,9 +160,16 @@ class ScanApplication:
             )
 
     def run_forever(self, fetcher: Callable[[str, str], list[Bar]]) -> None:
-        while True:
+        kst = pytz.timezone("Asia/Seoul")
+
+        def job() -> None:
             self.run_once(fetcher)
-            time.sleep(self.config.interval_seconds)
+
+        schedule.every().day.at("07:00").do(job)
+
+        while True:
+            schedule.run_pending()
+            time.sleep(60)
 
 
     def get_metrics_snapshot(self) -> RuntimeSnapshot:
