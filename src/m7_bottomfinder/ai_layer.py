@@ -127,8 +127,6 @@ class AIInterpreter:
         ts = normalize_timestamp(now or datetime.now())
         if not decision.should_send:
             return AIInvocation(False, "alert suppressed", None)
-        if not summary.should_call_ai:
-            return AIInvocation(False, "ai threshold unmet", None)
 
         allowed, reason = self.limiter.allow(symbol, ts)
         if not allowed:
