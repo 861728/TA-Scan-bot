@@ -115,7 +115,7 @@ class BacktestSimulator:
 
         ttr: int | None = None
         for i, b in enumerate(future, start=1):
-            if b.high >= entry:
+            if b.close >= entry:
                 ttr = i
                 break
 
