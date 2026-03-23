@@ -1,8 +1,17 @@
 [runtime]
-symbols = ["AAPL", "MSFT", "GOOG", "AMZN", "NVDA", "META", "TSLA"]
-timeframe = "15m"
+symbols = [
+  "AAPL", "MSFT", "NVDA", "AMZN", "GOOG", "GOOGL", "META", "TSLA", "AVGO", "COST",
+  "NFLX", "ASML", "AMD", "PEP", "CSCO", "ADBE", "QCOM", "INTU", "AMAT", "TXN",
+  "BKNG", "ISRG", "MU", "HON", "VRTX", "REGN", "PANW", "KLAC", "LRCX", "SNPS",
+  "CDNS", "ABNB", "MELI", "ORLY", "FTNT", "CTAS", "MRVL", "MNST", "KDP", "ODFL",
+  "DXCM", "TEAM", "FAST", "ROST", "IDXX", "BIIB", "VRSK", "GEHC", "ON", "NXPI",
+  "CTSH", "CPRT", "PCAR", "PAYX", "DLTR", "ANSS", "FANG", "ZS", "CRWD", "DDOG",
+  "EBAY", "EXC", "ILMN", "LULU", "MAR", "MCHP", "MDLZ", "MRNA", "PYPL", "SBUX",
+  "WDAY", "ADP", "ALGN", "GILD", "MTCH", "NDAQ", "TTWO", "WBD", "ENPH", "ENTG"
+]
+timeframe = "1d"
 htf_filter = ["1h", "1d"]
-interval_seconds = 600
+interval_seconds = 86400
 cache_dir = "data/cache"
 
 [scoring]
