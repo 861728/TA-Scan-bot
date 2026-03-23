@@ -13,17 +13,6 @@ from .providers import KRWConverter
 from .recovery import FetchRecovery
 
 
-def _calc_atr(bars: list[Bar], period: int = 14) -> float | None:
-    if len(bars) < 2:
-        return None
-    trs: list[float] = []
-    for i in range(1, len(bars)):
-        b, prev = bars[i], bars[i - 1]
-        trs.append(max(b.high - b.low, abs(b.high - prev.close), abs(b.low - prev.close)))
-    recent = trs[-period:] if len(trs) >= period else trs
-    return sum(recent) / len(recent) if recent else None
-
-
 class Notifier(Protocol):
     def send(self, text: str) -> None:
         ...
@@ -104,13 +93,11 @@ class ScannerRuntime:
         if decision.should_send:
             last_price = cached_bars[-1].close if cached_bars else None
             krw_price = self.krw_converter.convert(last_price) if (self.krw_converter and last_price) else None
-            atr = _calc_atr(cached_bars) if cached_bars else None
             message = self._build_alert_text(
                 config, summary, decision,
                 ai.result.summary if ai.result else None,
                 last_price, krw_price,
                 results=results,
-                atr=atr,
             )
             self.notifier.send(message)
 
@@ -140,7 +127,6 @@ class ScannerRuntime:
         last_price: float | None = None,
         krw_price: float | None = None,
         results: list[IndicatorResult] | None = None,
-        atr: float | None = None,
     ) -> str:
         _INDICATOR_LABELS: dict[str, str] = {
             "wvf_spike": "WVF 스파이크",
@@ -184,23 +170,20 @@ class ScannerRuntime:
                 label = _INDICATOR_LABELS.get(r.indicator, r.indicator)
                 lines.append(f"• {label}")
 
-        if last_price is not None and atr is not None and atr > 0:
-            stop = last_price - 1.5 * atr
-            target = last_price + 3.0 * atr
-            stop_pct = (stop - last_price) / last_price * 100
-            target_pct = (target - last_price) / last_price * 100
-            rr = (target - last_price) / (last_price - stop) if last_price > stop else 0.0
+        if last_price is not None:
+            stop = last_price * 0.92
+            target = last_price * 1.20
+            rr = (target - last_price) / (last_price - stop)
             lines.append("")
-            lines.append("📐 매매 기준 (ATR 기반)")
+            lines.append("📐 매매 기준")
             lines.append(f"• 진입가: ${last_price:,.2f}")
-            lines.append(f"• 손절가: ${stop:,.2f} ({stop_pct:+.1f}%)")
-            lines.append(f"• 목표가: ${target:,.2f} ({target_pct:+.1f}%)")
+            lines.append(f"• 손절가: ${stop:,.2f} (-8.0%)")
+            lines.append(f"• 목표가: ${target:,.2f} (+20.0%)")
             lines.append(f"• 손익비: 1:{rr:.1f}")
 
-        if ai_summary:
-            lines.append("")
-            lines.append("🤖 AI 분석")
-            lines.append(ai_summary)
+        lines.append("")
+        lines.append("🤖 AI 분석")
+        lines.append(ai_summary if ai_summary else "분석 결과 없음")
 
         if decision.action == AlertAction.SEND_STRENGTHENED:
             lines.append("")
