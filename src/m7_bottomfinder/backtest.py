@@ -105,17 +105,17 @@ class BacktestSimulator:
             return BacktestTradeResult(signal, entry, 0.0, 0.0, False, None)
 
         lows = [b.low for b in future]
-        highs = [b.high for b in future]
+        closes = [b.close for b in future]
 
         min_low = min(lows)
-        max_high = max(highs)
+        max_close = max(closes)
         mdd = ((min_low - entry) / entry) * 100 if entry else 0.0
-        rebound = ((max_high - entry) / entry) * 100 if entry else 0.0
+        rebound = ((max_close - entry) / entry) * 100 if entry else 0.0
         hit = rebound >= self.precision_target_pct
 
         ttr: int | None = None
         for i, b in enumerate(future, start=1):
-            if b.high >= entry:
+            if b.close >= entry:
                 ttr = i
                 break
 
