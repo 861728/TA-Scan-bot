@@ -133,7 +133,7 @@ class TelegramHandler:
         self.trade_store.add_trade(symbol, price, today, track)
 
         sell_date = (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d")
-        track_label = "트랙 1 🔴" if track == 1 else "트랙 2 🟢"
+        track_label = "트랙 1 ⚡고수익" if track == 1 else "트랙 2 🛡️안전"
 
         self._send("\n".join([
             "✅ 매수 기록 저장",
@@ -154,7 +154,7 @@ class TelegramHandler:
         lines = ["📋 보유 포지션", self._SEP]
 
         for i, trade in enumerate(trades, 1):
-            track_emoji = "🔴" if trade.track == 1 else "🟢"
+            track_emoji = "⚡" if trade.track == 1 else "🛡️"
             entry_date = datetime.fromisoformat(trade.entry_date).date()
             days_held = (today - entry_date).days
 

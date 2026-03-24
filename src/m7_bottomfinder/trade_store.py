@@ -63,12 +63,17 @@ class TradeStore:
             conn.execute("UPDATE trades SET status = 'closed' WHERE id = ?", (trade_id,))
             conn.commit()
 
-    def get_trades_due_today(self) -> list[Trade]:
-        """진입일 기준 30일이 지난 open 포지션 반환."""
+    def get_trades_due_soon(self) -> list[Trade]:
+        """진입일 기준 D-7 ~ D-day(이후 포함)인 open 포지션 반환."""
         today = datetime.utcnow().date()
         due: list[Trade] = []
         for trade in self.get_open_trades():
             entry = datetime.fromisoformat(trade.entry_date).date()
-            if today >= entry + timedelta(days=30):
+            days_remaining = 30 - (today - entry).days
+            if days_remaining <= 7:
                 due.append(trade)
         return due
+
+    def get_portfolio_summary(self) -> list[Trade]:
+        """open 포지션 전체 반환 (진입가, 진입일, 트랙 포함). get_open_trades 의 alias."""
+        return self.get_open_trades()
