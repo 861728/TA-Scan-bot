@@ -477,6 +477,61 @@ class MACDDivergenceIndicator(BaseIndicator):
         return IndicatorResult(self.name, SignalDirection.BULLISH if bull else SignalDirection.NEUTRAL, self.weight if bull else 0, signal.evidence, {"kind": signal.kind.value}, normalize_timestamp(bars[-1].timestamp))
 
 
+def calculate_score(bars: list[Bar]) -> int:
+    """바닥 종합 점수 (0~9). RSI·고점낙폭·저가근접·CMF 기반."""
+    if len(bars) < 30:
+        return 0
+
+    closes = [b.close for b in bars]
+    score = 0
+
+    # RSI
+    r = _last(_rsi(closes), 50.0)
+    if r < 30:
+        score += 3
+    elif r < 40:
+        score += 2
+    elif r < 50:
+        score += 1
+
+    # 고점 대비 낙폭
+    year_high = max(b.high for b in bars[-252:]) if len(bars) >= 252 else max(b.high for b in bars)
+    high_dist = (closes[-1] / year_high - 1) * 100
+    if high_dist <= -20:
+        score += 3
+
+    # 52주 저가 대비 위치
+    year_low = min(b.low for b in bars[-252:]) if len(bars) >= 252 else min(b.low for b in bars)
+    low_dist = (closes[-1] / year_low - 1) * 100
+    if low_dist <= 20:
+        score += 2
+
+    # CMF 음수
+    mf_sum = vol_sum = 0.0
+    for b in bars[-20:]:
+        if b.high != b.low:
+            mfm = ((b.close - b.low) - (b.high - b.close)) / (b.high - b.low)
+        else:
+            mfm = 0.0
+        mf_sum += mfm * b.volume
+        vol_sum += b.volume
+    if vol_sum > 0 and mf_sum / vol_sum < 0:
+        score += 1
+
+    return score
+
+
+def is_soxx_condition_met(soxx_bars: list[Bar]) -> bool:
+    """SOXX가 52주 고점 대비 -30% 이상 하락했을 때만 True."""
+    window = soxx_bars[-252:] if len(soxx_bars) >= 252 else soxx_bars
+    if not window:
+        return False
+    year_high = max(b.high for b in window)
+    cur = soxx_bars[-1].close
+    dist = (cur / year_high - 1) * 100
+    return dist <= -30
+
+
 def default_phase2_indicators() -> list[BaseIndicator]:
     return [
         WVFIndicator(),

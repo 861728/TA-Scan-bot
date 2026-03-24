@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 import ast
@@ -15,7 +15,7 @@ from .ai_layer import AIInterpreter, AIUsageLimiter, ClaudeProvider, RuleBasedPr
 from .alert_engine import AlertEngine
 from .data_layer import Bar, DataCache, DataLayer
 from .indicator_engine import IndicatorEngine
-from .indicators import default_phase2_indicators
+from .indicators import default_phase2_indicators, is_soxx_condition_met
 from .monitoring import RuntimeMetrics, RuntimeSnapshot
 from .providers import KRWConverter
 from .recovery import FetchRecovery
@@ -38,6 +38,8 @@ class ScanAppConfig:
     telegram_bot_token: str | None
     telegram_chat_id: str | None
     anthropic_api_key: str | None = None
+    high_risk_symbols: tuple[str, ...] = field(default_factory=tuple)
+    low_risk_symbols: tuple[str, ...] = field(default_factory=tuple)
 
     @staticmethod
     def from_toml(path: str | Path) -> "ScanAppConfig":
@@ -48,13 +50,14 @@ class ScanAppConfig:
         alerts = payload.get("alerts", {})
         ai = payload.get("ai", {})
         telegram = payload.get("telegram", {})
+        symbols_cfg = payload.get("symbols", {})
 
         return ScanAppConfig(
             symbols=list(runtime.get("symbols", ["AAPL"])),
             timeframe=str(runtime.get("timeframe", "15m")),
             interval_seconds=int(runtime.get("interval_seconds", 600)),
             cache_dir=str(runtime.get("cache_dir", "data/cache")),
-            score_threshold=int(scoring.get("score_threshold", 5)),
+            score_threshold=int(scoring.get("score_threshold", 8)),
             ai_call_threshold=int(scoring.get("ai_call_threshold", 6)),
             min_s_hits_for_ai=int(scoring.get("min_s_hits_for_ai", 2)),
             cooldown_minutes=int(alerts.get("cooldown_minutes", 120)),
@@ -64,6 +67,8 @@ class ScanAppConfig:
             telegram_bot_token=_none_if_blank(telegram.get("bot_token")),
             telegram_chat_id=_none_if_blank(telegram.get("chat_id")),
             anthropic_api_key=_none_if_blank(ai.get("anthropic_api_key")) or _none_if_blank(os.environ.get("ANTHROPIC_API_KEY")),
+            high_risk_symbols=tuple(symbols_cfg.get("high_risk", [])),
+            low_risk_symbols=tuple(symbols_cfg.get("low_risk", [])),
         )
 
 
@@ -154,14 +159,31 @@ class ScanApplication:
         """Run a full scan cycle, send summary, and return list of symbols that triggered an alert."""
         now = datetime.utcnow()
         alerted: list[str] = []
+
+        soxx_bars = fetcher("SOXX", self.config.timeframe)
+        if not is_soxx_condition_met(soxx_bars):
+            self.notifier.send("⚠️ SOXX 조건 미충족 (52주 고점 대비 -30% 미달) — 오늘 스캔 건너뜀")
+            return alerted
+
+        high_risk_set = set(self.config.high_risk_symbols)
+        low_risk_set = set(self.config.low_risk_symbols)
+
         for symbol in self.config.symbols:
+            if symbol in high_risk_set:
+                risk_tier = "high"
+            elif symbol in low_risk_set:
+                risk_tier = "low"
+            else:
+                risk_tier = "default"
+
             result = self.runtime.run_cycle(
-                config=ScanRuntimeConfig(symbol=symbol, timeframe=self.config.timeframe),
+                config=ScanRuntimeConfig(symbol=symbol, timeframe=self.config.timeframe, risk_tier=risk_tier),
                 fetcher=fetcher,
                 now=now,
             )
             if result.alert_decision.should_send:
                 alerted.append(symbol)
+
         self.notifier.send(self._build_daily_summary(alerted, self.config.symbols))
         return alerted
 
