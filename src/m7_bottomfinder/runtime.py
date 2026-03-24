@@ -7,7 +7,8 @@ from typing import Callable, Protocol
 from .ai_layer import AIInterpreter
 from .alert_engine import AlertAction, AlertDecision, AlertEngine
 from .data_layer import Bar, DataCache, DataLayer, normalize_timestamp
-from .indicator_engine import IndicatorEngine, IndicatorResult, SignalSummary
+from .indicator_engine import IndicatorEngine, IndicatorResult, SignalDirection, SignalSummary
+from .indicators import calculate_score
 from .monitoring import RuntimeMetrics
 from .providers import KRWConverter
 from .recovery import FetchRecovery
@@ -23,6 +24,7 @@ class ScanRuntimeConfig:
     symbol: str
     timeframe: str = "15m"
     max_gap_minutes: int = 60
+    risk_tier: str = "default"  # "high" | "low" | "default"
 
 
 @dataclass(frozen=True)
@@ -78,7 +80,23 @@ class ScannerRuntime:
         )
         cached_bars = self.cache.load(config.symbol, config.timeframe)
 
-        results, summary = self.indicator_engine.run(cached_bars)
+        results, _ind_summary = self.indicator_engine.run(cached_bars)
+        composite = calculate_score(cached_bars)
+        threshold = self.indicator_engine.score_threshold
+        should_alert = composite >= threshold
+        summary = SignalSummary(
+            total_score=composite,
+            strongest_signal=SignalDirection.BULLISH if composite > 0 else SignalDirection.NEUTRAL,
+            bullish_count=_ind_summary.bullish_count,
+            bearish_count=_ind_summary.bearish_count,
+            neutral_count=_ind_summary.neutral_count,
+            should_alert=should_alert,
+            should_call_ai=should_alert and (
+                composite >= self.indicator_engine.ai_call_threshold
+                or _ind_summary.s_tier_hits >= self.indicator_engine.min_s_hits_for_ai
+            ),
+            s_tier_hits=_ind_summary.s_tier_hits,
+        )
         decision = self.alert_engine.decide(config.symbol, summary, results, ts)
 
         ai = self.ai_interpreter.maybe_call(
@@ -148,9 +166,19 @@ class ScannerRuntime:
             "macd_divergence": "MACD 다이버전스",
         }
 
+        _RISK_PARAMS = {
+            "high":    {"emoji": "🔴", "stop_pct": 0.08, "target_pct": 0.20},
+            "low":     {"emoji": "🟢", "stop_pct": 0.05, "target_pct": 0.10},
+            "default": {"emoji": "🎯", "stop_pct": 0.08, "target_pct": 0.20},
+        }
+        params = _RISK_PARAMS.get(config.risk_tier, _RISK_PARAMS["default"])
+        emoji = params["emoji"]
+        stop_pct = params["stop_pct"]
+        target_pct = params["target_pct"]
+
         sep = "━━━━━━━━━━━━━━━"
         lines = [
-            f"🎯 {config.symbol} 바닥 시그널 · {config.timeframe}",
+            f"{emoji} {config.symbol} 바닥 시그널 · {config.timeframe}",
             sep,
         ]
 
@@ -171,14 +199,14 @@ class ScannerRuntime:
                 lines.append(f"• {label}")
 
         if last_price is not None:
-            stop = last_price * 0.92
-            target = last_price * 1.20
+            stop = last_price * (1 - stop_pct)
+            target = last_price * (1 + target_pct)
             rr = (target - last_price) / (last_price - stop)
             lines.append("")
             lines.append("📐 매매 기준")
             lines.append(f"• 진입가: ${last_price:,.2f}")
-            lines.append(f"• 손절가: ${stop:,.2f} (-8.0%)")
-            lines.append(f"• 목표가: ${target:,.2f} (+20.0%)")
+            lines.append(f"• 손절가: ${stop:,.2f} (-{stop_pct * 100:.1f}%)")
+            lines.append(f"• 목표가: ${target:,.2f} (+{target_pct * 100:.1f}%)")
             lines.append(f"• 손익비: 1:{rr:.1f}")
 
         lines.append("")
