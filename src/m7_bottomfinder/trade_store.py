@@ -72,3 +72,7 @@ class TradeStore:
             if today >= entry + timedelta(days=30):
                 due.append(trade)
         return due
+
+    def get_portfolio_summary(self) -> list[Trade]:
+        """open 포지션 전체 반환 (진입가, 진입일, 트랙 포함). get_open_trades 의 alias."""
+        return self.get_open_trades()
