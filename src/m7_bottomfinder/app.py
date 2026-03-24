@@ -203,7 +203,9 @@ class ScanApplication:
             if result.alert_decision.should_send:
                 alerted.append(symbol)
 
-        self.notifier.send(self._build_daily_summary(alerted, self.config.symbols))
+        summary = self._build_daily_summary(alerted, self.config.symbols)
+        portfolio_block = self._build_portfolio_block(fetcher)
+        self.notifier.send(summary + "\n\n" + portfolio_block)
         return alerted
 
     @staticmethod
@@ -216,6 +218,42 @@ class ScanApplication:
             f"신호 종목: {', '.join(alerted)} ({len(alerted)}개)",
             f"신호 없음 종목: {', '.join(no_signal) if no_signal else '없음'}",
         ]
+        return "\n".join(lines)
+
+    def _build_portfolio_block(self, fetcher: Callable[[str, str], list[Bar]]) -> str:
+        """보유 포지션 현황 블록 조립. 요약 메시지 뒤에 덧붙임."""
+        trades = self.trade_store.get_portfolio_summary()
+        if not trades:
+            return "💼 보유 포지션: 없음"
+
+        today = datetime.utcnow().date()
+        position_lines: list[str] = []
+        sell_lines: list[str] = []
+
+        for trade in trades:
+            track_emoji = "🔴" if trade.track == 1 else "🟢"
+            entry_date = datetime.fromisoformat(trade.entry_date).date()
+            days_held = (today - entry_date).days
+            sell_date = (entry_date + timedelta(days=30)).strftime("%Y-%m-%d")
+
+            bars = fetcher(trade.symbol, self.config.timeframe)
+            current = bars[-1].close if bars else None
+
+            if current is not None:
+                pnl = (current / trade.entry_price - 1) * 100
+                sign = "+" if pnl >= 0 else ""
+                position_lines.append(
+                    f"• {trade.symbol} {track_emoji} | 진입 ${trade.entry_price:,.2f}"
+                    f" | 현재 ${current:,.2f} | {sign}{pnl:.1f}% | D+{days_held}"
+                )
+            else:
+                position_lines.append(
+                    f"• {trade.symbol} {track_emoji} | 진입 ${trade.entry_price:,.2f} | D+{days_held}"
+                )
+
+            sell_lines.append(f"• {trade.symbol} → {sell_date} (D+30)")
+
+        lines = ["💼 보유 포지션"] + position_lines + ["📌 매도 예정"] + sell_lines
         return "\n".join(lines)
 
     @staticmethod
