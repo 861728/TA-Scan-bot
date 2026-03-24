@@ -68,4 +68,5 @@ target_avg_rebound_pct = 5.0
 
 [telegram]
 bot_token = ""
-chat_id = ""
+chat_id   = ""
+db_path   = "trades.db"   # SQLite 매수 기록 경로 (VPS: /opt/m7-bottomfinder/trades.db)

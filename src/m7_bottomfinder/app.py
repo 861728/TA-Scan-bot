@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 import ast
 import os
@@ -20,6 +20,7 @@ from .monitoring import RuntimeMetrics, RuntimeSnapshot
 from .providers import KRWConverter
 from .recovery import FetchRecovery
 from .runtime import Notifier, ScanRuntimeConfig, ScannerRuntime
+from .trade_store import Trade, TradeStore
 
 
 @dataclass(frozen=True)
@@ -39,6 +40,7 @@ class ScanAppConfig:
     telegram_bot_token: str | None
     telegram_chat_id: str | None
     anthropic_api_key: str | None = None
+    db_path: str = "trades.db"
     high_risk_symbols: tuple[str, ...] = field(default_factory=tuple)
     low_risk_symbols: tuple[str, ...] = field(default_factory=tuple)
     track1_symbols: tuple[str, ...] = field(default_factory=tuple)
@@ -71,6 +73,7 @@ class ScanAppConfig:
             telegram_bot_token=_none_if_blank(telegram.get("bot_token")),
             telegram_chat_id=_none_if_blank(telegram.get("chat_id")),
             anthropic_api_key=_none_if_blank(ai.get("anthropic_api_key")) or _none_if_blank(os.environ.get("ANTHROPIC_API_KEY")),
+            db_path=str(telegram.get("db_path", "trades.db")),
             high_risk_symbols=tuple(symbols_cfg.get("high_risk", [])),
             low_risk_symbols=tuple(symbols_cfg.get("low_risk", [])),
             track1_symbols=tuple(symbols_cfg.get("track1_symbols", ["NVDA", "MRVL", "CRWD", "ZS", "ON"])),
@@ -130,6 +133,7 @@ class ScanApplication:
     def __init__(self, config: ScanAppConfig, notifier: Notifier | None = None) -> None:
         self.config = config
         self.notifier = notifier or ConsoleNotifier()
+        self.trade_store = TradeStore(config.db_path)
 
         self.metrics = RuntimeMetrics()
 
@@ -168,6 +172,12 @@ class ScanApplication:
         """Run a full scan cycle, send summary, and return list of symbols that triggered an alert."""
         now = datetime.utcnow()
         alerted: list[str] = []
+
+        # 매도 타이밍 알람: 30일 경과 포지션
+        for trade in self.trade_store.get_trades_due_today():
+            bars = fetcher(trade.symbol, self.config.timeframe)
+            current = bars[-1].close if bars else None
+            self.notifier.send(self._build_sell_alert(trade, current))
 
         soxx_bars = fetcher("SOXX", self.config.timeframe)
         if not is_soxx_condition_met(soxx_bars):
@@ -208,7 +218,39 @@ class ScanApplication:
         ]
         return "\n".join(lines)
 
+    @staticmethod
+    def _build_sell_alert(trade: Trade, current_price: float | None) -> str:
+        sep = "━━━━━━━━━━━━━━━"
+        sell_date = (
+            datetime.fromisoformat(trade.entry_date) + timedelta(days=30)
+        ).strftime("%Y-%m-%d")
+        lines = [
+            f"🔔 {trade.symbol} 매도 타이밍",
+            sep,
+            f"📅 진입일: {trade.entry_date}",
+            f"📅 매도 권장일: {sell_date} (30일)",
+            f"💰 진입가: ${trade.entry_price:,.2f}",
+        ]
+        if current_price is not None:
+            pnl = (current_price / trade.entry_price - 1) * 100
+            sign = "+" if pnl >= 0 else ""
+            lines.append(f"📈 현재가: ${current_price:,.2f}")
+            lines.append(f"📊 수익률: {sign}{pnl:.1f}%")
+        return "\n".join(lines)
+
     def run_forever(self, fetcher: Callable[[str, str], list[Bar]]) -> None:
+        # 텔레그램 명령어 polling 스레드 시작
+        if self.config.telegram_bot_token and self.config.telegram_chat_id:
+            from .telegram_handler import TelegramHandler
+            handler = TelegramHandler(
+                bot_token=self.config.telegram_bot_token,
+                chat_id=self.config.telegram_chat_id,
+                trade_store=self.trade_store,
+                track1_symbols=self.config.track1_symbols,
+                track2_symbols=self.config.track2_symbols,
+            )
+            handler.start()
+
         schedule.every().day.at("07:00").do(self.run_once, fetcher)
 
         while True:
