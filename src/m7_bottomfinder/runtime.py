@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Callable, Protocol
 
 from .ai_layer import AIInterpreter
-from .alert_engine import AlertAction, AlertDecision, AlertEngine
+from .alert_engine import AlertDecision, AlertEngine
 from .data_layer import Bar, DataCache, DataLayer, normalize_timestamp
 from .indicator_engine import IndicatorEngine, IndicatorResult, SignalSummary
 from .monitoring import RuntimeMetrics
@@ -82,31 +82,11 @@ class ScannerRuntime:
         results, summary = self.indicator_engine.run(cached_bars, config.symbol)
         decision = self.alert_engine.decide(config.symbol, summary, results, ts)
 
-        ai = self.ai_interpreter.maybe_call(
-            symbol=config.symbol,
-            timeframe=config.timeframe,
-            summary=summary,
-            results=results,
-            decision=decision,
-            now=ts,
-        )
-
-        if decision.should_send:
-            last_price = cached_bars[-1].close if cached_bars else None
-            krw_price = self.krw_converter.convert(last_price) if (self.krw_converter and last_price) else None
-            message = self._build_alert_text(
-                config, summary, decision,
-                ai.result.summary if ai.result else None,
-                last_price, krw_price,
-                results=results,
-            )
-            self.notifier.send(message)
-
         if self.metrics is not None:
             self.metrics.record_cycle(
                 data_source=recovered.source,
                 alert_sent=decision.should_send,
-                ai_called=ai.called,
+                ai_called=False,
             )
 
         return ScanCycleResult(
@@ -114,76 +94,8 @@ class ScannerRuntime:
             symbol=config.symbol,
             summary=summary,
             alert_decision=decision,
-            ai_called=ai.called,
-            ai_reason=ai.reason,
+            ai_called=False,
+            ai_reason="",
             data_source=recovered.source,
         )
 
-    @staticmethod
-    def _build_alert_text(
-        config: ScanRuntimeConfig,
-        summary: SignalSummary,
-        decision: AlertDecision,
-        ai_summary: str | None,
-        last_price: float | None = None,
-        krw_price: float | None = None,
-        results: list[IndicatorResult] | None = None,
-    ) -> str:
-        _INDICATOR_LABELS: dict[str, str] = {
-            "wvf_spike": "WVF 스파이크",
-            "volume_capitulation": "거래량 항복",
-            "obv_divergence": "OBV 다이버전스",
-            "mfi": "MFI 과매도",
-            "cmf": "CMF 자금유입",
-            "triple_stoch_rsi": "스토캐스틱 RSI",
-            "adline_divergence": "AD라인 다이버전스",
-            "composite_oscillator": "복합 오실레이터",
-            "vpt": "VPT 반등",
-            "nvi_pvi": "NVI/PVI 반전",
-            "rsi_sma200": "RSI + 200MA",
-            "bb_stochastic": "BB 스토캐스틱",
-            "macd_obv_divergence": "MACD+OBV 다이버전스",
-            "fibonacci_618_support": "피보나치 0.618 지지",
-            "ichimoku_rsi_obv": "일목+RSI+OBV",
-            "ks_reversal": "캔들 반전",
-            "macd_divergence": "MACD 다이버전스",
-        }
-
-        track_emoji = "🔴" if summary.track == 1 else "🟢"
-        target_pct = 0.20 if summary.track == 1 else 0.10
-
-        sep = "━━━━━━━━━━━━━━━"
-        lines = [
-            f"🎯 {config.symbol} 바닥 시그널 · {config.timeframe} {track_emoji}",
-            sep,
-        ]
-
-        if last_price is not None:
-            price_str = f"💰 현재가: ${last_price:,.2f}"
-            if krw_price is not None:
-                price_str += f" (₩{krw_price:,.0f})"
-            lines.append(price_str)
-
-        lines.append(f"⚡ 신호 강도: {summary.total_score}점")
-
-        active = [r for r in (results or []) if r.score > 0]
-        if active:
-            lines.append("📊 핵심 근거")
-            for r in active:
-                label = _INDICATOR_LABELS.get(r.indicator, r.indicator)
-                lines.append(f"- {label}")
-
-        if last_price is not None:
-            target = last_price * (1 + target_pct)
-            lines.append("📐 매매 기준")
-            lines.append(f"- 진입가: ${last_price:,.2f}")
-            lines.append(f"- 목표가: ${target:,.2f} (+{target_pct * 100:.1f}%)")
-            lines.append("- 홀딩: 30일")
-
-        lines.append("🤖 AI 분석")
-        lines.append(ai_summary if ai_summary else "분석 결과 없음")
-
-        if decision.action == AlertAction.SEND_STRENGTHENED:
-            lines.append("⬆️ 이전 대비 신호 강화")
-
-        return "\n".join(lines)
