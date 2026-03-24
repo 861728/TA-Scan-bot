@@ -57,7 +57,7 @@ def test_runtime_cycle_sends_alert_and_ai_summary(tmp_path) -> None:
     cache = DataCache(tmp_path)
     layer = DataLayer(cache)
     recovery = FetchRecovery(cache)
-    indicator_engine = IndicatorEngine([DummyBullishIndicator()], score_threshold=5, ai_call_threshold=6, min_s_hits_for_ai=1, s_tier_names={"dummy_s"})
+    indicator_engine = IndicatorEngine([DummyBullishIndicator()], track1_threshold=5, ai_call_threshold=6, min_s_hits_for_ai=1, s_tier_names={"dummy_s"})
     alert_engine = AlertEngine(cooldown_minutes=0)
     ai = AIInterpreter(RuleBasedProvider(), AIUsageLimiter(per_symbol=3, global_daily=20))
     notifier = MemoryNotifier()
@@ -84,7 +84,7 @@ def test_runtime_cycle_uses_cache_fallback(tmp_path) -> None:
 
     layer = DataLayer(cache)
     recovery = FetchRecovery(cache)
-    indicator_engine = IndicatorEngine([DummyBullishIndicator()], score_threshold=5, ai_call_threshold=6, min_s_hits_for_ai=1, s_tier_names={"dummy_s"})
+    indicator_engine = IndicatorEngine([DummyBullishIndicator()], track1_threshold=5, ai_call_threshold=6, min_s_hits_for_ai=1, s_tier_names={"dummy_s"})
     alert_engine = AlertEngine(cooldown_minutes=0)
     ai = AIInterpreter(RuleBasedProvider(), AIUsageLimiter())
     notifier = MemoryNotifier()

@@ -32,7 +32,7 @@ def make_bars(n: int = 120) -> list[Bar]:
 
 def test_alert_engine_cooldown_and_strengthened() -> None:
     bars = make_bars()
-    engine = IndicatorEngine([WVFIndicator(), MFIIndicator()], score_threshold=1, ai_call_threshold=2, min_s_hits_for_ai=1, s_tier_names={"wvf_spike"})
+    engine = IndicatorEngine([WVFIndicator(), MFIIndicator()], track1_threshold=1, ai_call_threshold=2, min_s_hits_for_ai=1, s_tier_names={"wvf_spike"})
     results, summary = engine.run(bars)
     a = AlertEngine(cooldown_minutes=120, strengthened_delta=3)
     now = datetime(2026, 2, 1, 0, 0, tzinfo=UTC)
@@ -47,7 +47,7 @@ def test_alert_engine_cooldown_and_strengthened() -> None:
 
 def test_ai_interpreter_gate_and_limit() -> None:
     bars = make_bars()
-    engine = IndicatorEngine([WVFIndicator()], score_threshold=1, ai_call_threshold=1, min_s_hits_for_ai=1, s_tier_names={"wvf_spike"})
+    engine = IndicatorEngine([WVFIndicator()], track1_threshold=1, ai_call_threshold=1, min_s_hits_for_ai=1, s_tier_names={"wvf_spike"})
     results, summary = engine.run(bars)
     decision = AlertEngine(cooldown_minutes=0).decide("AAPL", summary, results, datetime(2026, 2, 1, tzinfo=UTC))
 

@@ -41,7 +41,7 @@ def test_backtest_generates_signals_and_report() -> None:
     bars = make_bars()
     engine = IndicatorEngine(
         indicators=[WVFIndicator(), MFIIndicator()],
-        score_threshold=1,
+        track1_threshold=1,
         ai_call_threshold=2,
         min_s_hits_for_ai=1,
         s_tier_names={"wvf_spike"},
@@ -64,7 +64,7 @@ def test_backtest_generates_signals_and_report() -> None:
 
 def test_summarize_kpi_shape() -> None:
     bars = make_bars()
-    engine = IndicatorEngine(indicators=[WVFIndicator()], score_threshold=1)
+    engine = IndicatorEngine(indicators=[WVFIndicator()], track1_threshold=1)
     sim = BacktestSimulator(engine=engine, lookahead_bars=20)
 
     _, _, report = sim.run(bars, warmup_bars=30)
