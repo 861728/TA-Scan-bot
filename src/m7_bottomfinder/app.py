@@ -150,20 +150,37 @@ class ScanApplication:
             krw_converter=KRWConverter(),
         )
 
-    def run_once(self, fetcher: Callable[[str, str], list[Bar]]) -> None:
+    def run_once(self, fetcher: Callable[[str, str], list[Bar]]) -> list[str]:
+        """Run a full scan cycle and return list of symbols that triggered an alert."""
         now = datetime.utcnow()
+        alerted: list[str] = []
         for symbol in self.config.symbols:
-            self.runtime.run_cycle(
+            result = self.runtime.run_cycle(
                 config=ScanRuntimeConfig(symbol=symbol, timeframe=self.config.timeframe),
                 fetcher=fetcher,
                 now=now,
             )
+            if result.alert_decision.should_send:
+                alerted.append(symbol)
+        return alerted
+
+    @staticmethod
+    def _build_daily_summary(alerted: list[str], all_symbols: list[str]) -> str:
+        if not alerted:
+            return "오늘 바닥 신호 없음 ✅ 봇 정상 작동 중"
+        no_signal = [s for s in all_symbols if s not in alerted]
+        lines = [
+            "📅 오늘의 M7 스캔 결과",
+            f"신호 종목: {', '.join(alerted)} ({len(alerted)}개)",
+            f"신호 없음 종목: {', '.join(no_signal) if no_signal else '없음'}",
+        ]
+        return "\n".join(lines)
 
     def run_forever(self, fetcher: Callable[[str, str], list[Bar]]) -> None:
-        kst = pytz.timezone("Asia/Seoul")
-
         def job() -> None:
-            self.run_once(fetcher)
+            alerted = self.run_once(fetcher)
+            summary = self._build_daily_summary(alerted, self.config.symbols)
+            self.notifier.send(summary)
 
         schedule.every().day.at("07:00").do(job)
 
