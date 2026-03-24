@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 import ast
 import os
@@ -15,7 +15,7 @@ from .ai_layer import AIInterpreter, AIUsageLimiter, ClaudeProvider, RuleBasedPr
 from .alert_engine import AlertEngine
 from .data_layer import Bar, DataCache, DataLayer
 from .indicator_engine import IndicatorEngine
-from .indicators import default_phase2_indicators, is_soxx_condition_met
+from .indicators import default_phase2_indicators
 from .monitoring import RuntimeMetrics, RuntimeSnapshot
 from .providers import KRWConverter
 from .recovery import FetchRecovery
@@ -169,23 +169,21 @@ class ScanApplication:
         )
 
     def run_once(self, fetcher: Callable[[str, str], list[Bar]]) -> list[str]:
-        """Run a full scan cycle, send summary, and return list of symbols that triggered an alert."""
+        """Run a full scan cycle and send daily summary. Returns list of alerted symbols."""
         now = datetime.utcnow()
-        alerted: list[str] = []
+        today_kst = datetime.now(pytz.timezone("Asia/Seoul")).date()
 
-        # 매도 타이밍 알람: 30일 경과 포지션
-        for trade in self.trade_store.get_trades_due_today():
+        # ① D-7 ~ D-day 매도 알람 (해당 종목 있을 때만, 개별 발송)
+        for trade in self.trade_store.get_trades_due_soon():
             bars = fetcher(trade.symbol, self.config.timeframe)
             current = bars[-1].close if bars else None
-            self.notifier.send(self._build_sell_alert(trade, current))
+            self.notifier.send(self._build_sell_soon_alert(trade, current, today_kst))
 
-        soxx_bars = fetcher("SOXX", self.config.timeframe)
-        if not is_soxx_condition_met(soxx_bars):
-            self.notifier.send("⚠️ SOXX 조건 미충족 (52주 고점 대비 -30% 미달) — 오늘 스캔 건너뜀")
-            return alerted
-
+        # ② 종목 스캔 (개별 알람 발송 없음 — run_cycle에서 notifier 미사용)
         high_risk_set = set(self.config.high_risk_symbols)
         low_risk_set = set(self.config.low_risk_symbols)
+        # (symbol, track, score, last_price)
+        alerted_info: list[tuple[str, int, int, float | None]] = []
 
         for symbol in self.config.symbols:
             if symbol in high_risk_set:
@@ -201,79 +199,87 @@ class ScanApplication:
                 now=now,
             )
             if result.alert_decision.should_send:
-                alerted.append(symbol)
+                cached = self.runtime.cache.load(symbol, self.config.timeframe)
+                price = cached[-1].close if cached else None
+                alerted_info.append((symbol, result.summary.track, result.summary.total_score, price))
 
-        summary = self._build_daily_summary(alerted, self.config.symbols)
-        portfolio_block = self._build_portfolio_block(fetcher)
-        self.notifier.send(summary + "\n\n" + portfolio_block)
-        return alerted
-
-    @staticmethod
-    def _build_daily_summary(alerted: list[str], all_symbols: list[str]) -> str:
-        if not alerted:
-            return "오늘 바닥 신호 없음 ✅ 봇 정상 작동 중"
-        no_signal = [s for s in all_symbols if s not in alerted]
-        lines = [
-            "📅 오늘의 M7 스캔 결과",
-            f"신호 종목: {', '.join(alerted)} ({len(alerted)}개)",
-            f"신호 없음 종목: {', '.join(no_signal) if no_signal else '없음'}",
-        ]
-        return "\n".join(lines)
-
-    def _build_portfolio_block(self, fetcher: Callable[[str, str], list[Bar]]) -> str:
-        """보유 포지션 현황 블록 조립. 요약 메시지 뒤에 덧붙임."""
-        trades = self.trade_store.get_portfolio_summary()
-        if not trades:
-            return "💼 보유 포지션: 없음"
-
-        today = datetime.utcnow().date()
-        position_lines: list[str] = []
-        sell_lines: list[str] = []
-
-        for trade in trades:
-            track_emoji = "🔴" if trade.track == 1 else "🟢"
-            entry_date = datetime.fromisoformat(trade.entry_date).date()
-            days_held = (today - entry_date).days
-            sell_date = (entry_date + timedelta(days=30)).strftime("%Y-%m-%d")
-
-            bars = fetcher(trade.symbol, self.config.timeframe)
-            current = bars[-1].close if bars else None
-
-            if current is not None:
-                pnl = (current / trade.entry_price - 1) * 100
-                sign = "+" if pnl >= 0 else ""
-                position_lines.append(
-                    f"• {trade.symbol} {track_emoji} | 진입 ${trade.entry_price:,.2f}"
-                    f" | 현재 ${current:,.2f} | {sign}{pnl:.1f}% | D+{days_held}"
-                )
+        # ③ 포트폴리오 현재가 수집 (캐시 우선, 없으면 fetcher)
+        portfolio = self.trade_store.get_portfolio_summary()
+        portfolio_prices: dict[str, float | None] = {}
+        for trade in portfolio:
+            cached = self.runtime.cache.load(trade.symbol, self.config.timeframe)
+            if cached:
+                portfolio_prices[trade.symbol] = cached[-1].close
             else:
-                position_lines.append(
-                    f"• {trade.symbol} {track_emoji} | 진입 ${trade.entry_price:,.2f} | D+{days_held}"
-                )
+                bars = fetcher(trade.symbol, self.config.timeframe)
+                portfolio_prices[trade.symbol] = bars[-1].close if bars else None
 
-            sell_lines.append(f"• {trade.symbol} → {sell_date} (D+30)")
-
-        lines = ["💼 보유 포지션"] + position_lines + ["📌 매도 예정"] + sell_lines
-        return "\n".join(lines)
+        # ④ 일일 요약 단일 발송
+        self.notifier.send(self._build_daily_message(alerted_info, portfolio, portfolio_prices, today_kst))
+        return [info[0] for info in alerted_info]
 
     @staticmethod
-    def _build_sell_alert(trade: Trade, current_price: float | None) -> str:
-        sep = "━━━━━━━━━━━━━━━"
-        sell_date = (
-            datetime.fromisoformat(trade.entry_date) + timedelta(days=30)
-        ).strftime("%Y-%m-%d")
-        lines = [
-            f"🔔 {trade.symbol} 매도 타이밍",
-            sep,
-            f"📅 진입일: {trade.entry_date}",
-            f"📅 매도 권장일: {sell_date} (30일)",
-            f"💰 진입가: ${trade.entry_price:,.2f}",
-        ]
-        if current_price is not None:
-            pnl = (current_price / trade.entry_price - 1) * 100
+    def _build_sell_soon_alert(trade: Trade, current: float | None, today: date) -> str:
+        """D-7 ~ D-day 매도 알람 한 줄 메시지."""
+        entry_date = datetime.fromisoformat(trade.entry_date).date()
+        sell_date = entry_date + timedelta(days=30)
+        days_remaining = (sell_date - today).days
+
+        if current is not None:
+            pnl = (current / trade.entry_price - 1) * 100
             sign = "+" if pnl >= 0 else ""
-            lines.append(f"📈 현재가: ${current_price:,.2f}")
-            lines.append(f"📊 수익률: {sign}{pnl:.1f}%")
+            price_str = f" ${trade.entry_price:,.2f} → ${current:,.2f} ({sign}{pnl:.1f}%)"
+        else:
+            price_str = f" ${trade.entry_price:,.2f}"
+
+        if days_remaining <= 0:
+            return f"⏰ {trade.symbol} 오늘 매도일{price_str} | 오늘 청산 권장"
+        return f"⏰ {trade.symbol} 매도 D-{days_remaining}{price_str} | 매도일 {sell_date.strftime('%Y-%m-%d')}"
+
+    @staticmethod
+    def _build_daily_message(
+        alerted_info: list[tuple[str, int, int, float | None]],
+        portfolio: list[Trade],
+        portfolio_prices: dict[str, float | None],
+        today: date,
+    ) -> str:
+        """일일 요약 메시지 (신호 + 포트폴리오 통합)."""
+        SEP = "━━━━━━━━━━━━━━━"
+        lines = [f"📅 {today.strftime('%Y-%m-%d')} 스캔 결과", SEP]
+
+        # 신호 섹션
+        if alerted_info:
+            lines.append("⚡ 신호")
+            for symbol, track, score, price in alerted_info:
+                track_label = "⚡고수익" if track == 1 else "🛡️안전"
+                target_pct = "+20%" if track == 1 else "+10%"
+                price_str = f"${price:,.2f}" if price is not None else "N/A"
+                lines.append(f"• {symbol} {track_label} ({score}점) | {price_str} | {target_pct} | 30일")
+        else:
+            lines.append("⚡ 신호: 없음")
+
+        lines.append("")
+
+        # 포지션 섹션
+        if portfolio:
+            lines.append("💼 보유 포지션")
+            for trade in portfolio:
+                track_icon = "⚡" if trade.track == 1 else "🛡️"
+                entry_date = datetime.fromisoformat(trade.entry_date).date()
+                days_held = (today - entry_date).days
+                current = portfolio_prices.get(trade.symbol)
+                if current is not None:
+                    pnl = (current / trade.entry_price - 1) * 100
+                    sign = "+" if pnl >= 0 else ""
+                    lines.append(
+                        f"• {trade.symbol} {track_icon} | ${trade.entry_price:,.2f} → ${current:,.2f}"
+                        f" | {sign}{pnl:.1f}% | D+{days_held}"
+                    )
+                else:
+                    lines.append(f"• {trade.symbol} {track_icon} | ${trade.entry_price:,.2f} | D+{days_held}")
+        else:
+            lines.append("💼 보유 포지션: 없음")
+
         return "\n".join(lines)
 
     def run_forever(self, fetcher: Callable[[str, str], list[Bar]]) -> None:
