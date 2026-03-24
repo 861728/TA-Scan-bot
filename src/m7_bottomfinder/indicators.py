@@ -521,6 +521,45 @@ def calculate_score(bars: list[Bar]) -> int:
     return score
 
 
+def calculate_track2_score(bars: list[Bar]) -> int:
+    """눌림목 종합 점수 (0~6). 200MA·20MA·RSI·60일낙폭·거래량 기반."""
+    if len(bars) < 30:
+        return 0
+
+    closes = [b.close for b in bars]
+    score = 0
+
+    # 200MA 위 (+2)
+    sma200_val = _last(_sma(closes, 200), closes[-1]) if len(closes) >= 200 else _last(_sma(closes, len(closes)), closes[-1])
+    if closes[-1] > sma200_val:
+        score += 2
+
+    # 20MA 아래 (+1)
+    sma20_val = _last(_sma(closes, 20), closes[-1])
+    if closes[-1] < sma20_val:
+        score += 1
+
+    # RSI 38~48 (+1)
+    r = _last(_rsi(closes), 50.0)
+    if 38 <= r <= 48:
+        score += 1
+
+    # 60일 고점 대비 -12% ~ -20% 사이 (+1)
+    window_60 = bars[-60:] if len(bars) >= 60 else bars
+    high_60 = max(b.high for b in window_60)
+    high_dist = (closes[-1] / high_60 - 1) * 100
+    if -20 <= high_dist <= -12:
+        score += 1
+
+    # 거래량이 20일 평균의 0.9배 이하 (+1)
+    vol_window = bars[-20:] if len(bars) >= 20 else bars
+    avg_vol = sum(b.volume for b in vol_window) / len(vol_window)
+    if avg_vol > 0 and bars[-1].volume <= avg_vol * 0.9:
+        score += 1
+
+    return score
+
+
 def is_soxx_condition_met(soxx_bars: list[Bar]) -> bool:
     """SOXX가 52주 고점 대비 -30% 이상 하락했을 때만 True."""
     window = soxx_bars[-252:] if len(soxx_bars) >= 252 else soxx_bars

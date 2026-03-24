@@ -47,7 +47,7 @@ interval_seconds=60
 cache_dir="data/testcache"
 
 [scoring]
-score_threshold=5
+track1_threshold=5
 ai_call_threshold=6
 min_s_hits_for_ai=2
 
@@ -74,7 +74,8 @@ def test_application_run_once_executes_cycle(tmp_path) -> None:
         timeframe="15m",
         interval_seconds=1,
         cache_dir=str(tmp_path / "cache"),
-        score_threshold=1,
+        track1_threshold=1,
+        track2_threshold=2,
         ai_call_threshold=2,
         min_s_hits_for_ai=1,
         cooldown_minutes=0,

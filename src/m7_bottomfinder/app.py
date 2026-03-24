@@ -28,7 +28,8 @@ class ScanAppConfig:
     timeframe: str
     interval_seconds: int
     cache_dir: str
-    score_threshold: int
+    track1_threshold: int
+    track2_threshold: int
     ai_call_threshold: int
     min_s_hits_for_ai: int
     cooldown_minutes: int
@@ -40,6 +41,8 @@ class ScanAppConfig:
     anthropic_api_key: str | None = None
     high_risk_symbols: tuple[str, ...] = field(default_factory=tuple)
     low_risk_symbols: tuple[str, ...] = field(default_factory=tuple)
+    track1_symbols: tuple[str, ...] = field(default_factory=tuple)
+    track2_symbols: tuple[str, ...] = field(default_factory=tuple)
 
     @staticmethod
     def from_toml(path: str | Path) -> "ScanAppConfig":
@@ -57,7 +60,8 @@ class ScanAppConfig:
             timeframe=str(runtime.get("timeframe", "15m")),
             interval_seconds=int(runtime.get("interval_seconds", 600)),
             cache_dir=str(runtime.get("cache_dir", "data/cache")),
-            score_threshold=int(scoring.get("score_threshold", 8)),
+            track1_threshold=int(scoring.get("track1_threshold", 4)),
+            track2_threshold=int(scoring.get("track2_threshold", 5)),
             ai_call_threshold=int(scoring.get("ai_call_threshold", 6)),
             min_s_hits_for_ai=int(scoring.get("min_s_hits_for_ai", 2)),
             cooldown_minutes=int(alerts.get("cooldown_minutes", 120)),
@@ -69,6 +73,8 @@ class ScanAppConfig:
             anthropic_api_key=_none_if_blank(ai.get("anthropic_api_key")) or _none_if_blank(os.environ.get("ANTHROPIC_API_KEY")),
             high_risk_symbols=tuple(symbols_cfg.get("high_risk", [])),
             low_risk_symbols=tuple(symbols_cfg.get("low_risk", [])),
+            track1_symbols=tuple(symbols_cfg.get("track1_symbols", ["NVDA", "MRVL", "CRWD", "ZS", "ON"])),
+            track2_symbols=tuple(symbols_cfg.get("track2_symbols", ["MU", "LRCX", "NFLX", "KLAC"])),
         )
 
 
@@ -134,10 +140,13 @@ class ScanApplication:
             recovery=FetchRecovery(cache),
             indicator_engine=IndicatorEngine(
                 indicators=default_phase2_indicators(),
-                score_threshold=config.score_threshold,
+                track1_threshold=config.track1_threshold,
+                track2_threshold=config.track2_threshold,
                 ai_call_threshold=config.ai_call_threshold,
                 min_s_hits_for_ai=config.min_s_hits_for_ai,
                 s_tier_names={"wvf_spike", "volume_capitulation", "obv_divergence"},
+                track1_symbols=list(config.track1_symbols),
+                track2_symbols=list(config.track2_symbols),
             ),
             alert_engine=AlertEngine(
                 cooldown_minutes=config.cooldown_minutes,

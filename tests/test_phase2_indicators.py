@@ -52,7 +52,7 @@ def test_engine_runs_phase2_bundle() -> None:
     indicators = default_phase2_indicators()
     engine = IndicatorEngine(
         indicators=indicators,
-        score_threshold=5,
+        track1_threshold=5,
         ai_call_threshold=6,
         min_s_hits_for_ai=2,
         s_tier_names={"wvf_spike", "volume_capitulation", "obv_divergence"},

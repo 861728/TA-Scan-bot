@@ -15,11 +15,14 @@ interval_seconds = 86400
 cache_dir = "data/cache"
 
 [symbols]
-high_risk = ["NVDA", "MRVL", "ZS", "ON"]
-low_risk  = ["KLAC", "LRCX", "AMAT", "ASML"]
+high_risk      = ["NVDA", "MRVL", "ZS", "ON"]
+low_risk       = ["KLAC", "LRCX", "AMAT", "ASML"]
+track1_symbols = ["NVDA", "MRVL", "CRWD", "ZS", "ON"]
+track2_symbols = ["MU", "LRCX", "NFLX", "KLAC"]
 
 [scoring]
-score_threshold = 8
+track1_threshold  = 4   # 바닥반등 트랙 최소 점수 (max 9)
+track2_threshold  = 5   # 눌림목 트랙 최소 점수 (max 6)
 ai_call_threshold = 6
 min_s_hits_for_ai = 2
 

@@ -73,45 +73,54 @@ class SignalSummary:
     should_alert: bool
     should_call_ai: bool
     s_tier_hits: int
+    track: int = 1  # 1 = 바닥반등, 2 = 눌림목
 
 
 class IndicatorEngine:
     def __init__(
         self,
         indicators: list[Indicator],
-        score_threshold: int = 5,
+        track1_threshold: int = 4,
+        track2_threshold: int = 5,
         ai_call_threshold: int = 6,
         min_s_hits_for_ai: int = 2,
         s_tier_names: set[str] | None = None,
+        track1_symbols: list[str] | None = None,
+        track2_symbols: list[str] | None = None,
     ) -> None:
         self.indicators = indicators
-        self.score_threshold = score_threshold
+        self.track1_threshold = track1_threshold
+        self.track2_threshold = track2_threshold
         self.ai_call_threshold = ai_call_threshold
         self.min_s_hits_for_ai = min_s_hits_for_ai
         self.s_tier_names = s_tier_names or set()
+        self.track1_symbols: set[str] = set(track1_symbols or [])
+        self.track2_symbols: set[str] = set(track2_symbols or [])
 
-    def run(self, bars: list[Bar]) -> tuple[list[IndicatorResult], SignalSummary]:
+    def run(self, bars: list[Bar], symbol: str = "") -> tuple[list[IndicatorResult], SignalSummary]:
+        # lazy import to avoid circular dependency (indicators.py imports from indicator_engine.py)
+        from .indicators import calculate_score, calculate_track2_score
+
         results = [indicator.evaluate(bars) for indicator in self.indicators]
         bullish = sum(1 for r in results if r.signal == SignalDirection.BULLISH)
         bearish = sum(1 for r in results if r.signal == SignalDirection.BEARISH)
         neutral = len(results) - bullish - bearish
-        total_score = sum(r.score for r in results)
 
-        strongest = SignalDirection.NEUTRAL
-        if bullish > bearish:
-            strongest = SignalDirection.BULLISH
-        elif bearish > bullish:
-            strongest = SignalDirection.BEARISH
+        track = 2 if symbol in self.track2_symbols else 1
+        composite = calculate_track2_score(bars) if track == 2 else calculate_score(bars)
+        threshold = self.track2_threshold if track == 2 else self.track1_threshold
+        should_alert = composite >= threshold
 
         s_hits = sum(1 for r in results if r.indicator in self.s_tier_names and r.score > 0)
         summary = SignalSummary(
-            total_score=total_score,
-            strongest_signal=strongest,
+            total_score=composite,
+            strongest_signal=SignalDirection.BULLISH if composite > 0 else SignalDirection.NEUTRAL,
             bullish_count=bullish,
             bearish_count=bearish,
             neutral_count=neutral,
-            should_alert=total_score >= self.score_threshold,
-            should_call_ai=(total_score >= self.ai_call_threshold or s_hits >= self.min_s_hits_for_ai),
+            should_alert=should_alert,
+            should_call_ai=should_alert and (composite >= self.ai_call_threshold or s_hits >= self.min_s_hits_for_ai),
             s_tier_hits=s_hits,
+            track=track,
         )
         return results, summary
