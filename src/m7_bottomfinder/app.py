@@ -151,7 +151,7 @@ class ScanApplication:
         )
 
     def run_once(self, fetcher: Callable[[str, str], list[Bar]]) -> list[str]:
-        """Run a full scan cycle and return list of symbols that triggered an alert."""
+        """Run a full scan cycle, send summary, and return list of symbols that triggered an alert."""
         now = datetime.utcnow()
         alerted: list[str] = []
         for symbol in self.config.symbols:
@@ -162,6 +162,7 @@ class ScanApplication:
             )
             if result.alert_decision.should_send:
                 alerted.append(symbol)
+        self.notifier.send(self._build_daily_summary(alerted, self.config.symbols))
         return alerted
 
     @staticmethod
@@ -177,12 +178,7 @@ class ScanApplication:
         return "\n".join(lines)
 
     def run_forever(self, fetcher: Callable[[str, str], list[Bar]]) -> None:
-        def job() -> None:
-            alerted = self.run_once(fetcher)
-            summary = self._build_daily_summary(alerted, self.config.symbols)
-            self.notifier.send(summary)
-
-        schedule.every().day.at("07:00").do(job)
+        schedule.every().day.at("07:00").do(self.run_once, fetcher)
 
         while True:
             schedule.run_pending()
