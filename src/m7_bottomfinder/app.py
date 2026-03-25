@@ -182,8 +182,8 @@ class ScanApplication:
         # ② 종목 스캔 (개별 알람 발송 없음 — run_cycle에서 notifier 미사용)
         high_risk_set = set(self.config.high_risk_symbols)
         low_risk_set = set(self.config.low_risk_symbols)
-        # (symbol, track, score, last_price)
-        alerted_info: list[tuple[str, int, int, float | None]] = []
+        # (symbol, track, score, last_price, condition_detail)
+        alerted_info: list[tuple[str, int, int, float | None, str]] = []
 
         for symbol in self.config.symbols:
             if symbol in high_risk_set:
@@ -201,7 +201,7 @@ class ScanApplication:
             if result.alert_decision.should_send:
                 cached = self.runtime.cache.load(symbol, self.config.timeframe)
                 price = cached[-1].close if cached else None
-                alerted_info.append((symbol, result.summary.track, result.summary.total_score, price))
+                alerted_info.append((symbol, result.summary.track, result.summary.total_score, price, result.condition_detail))
 
         # ③ 포트폴리오 현재가 수집 (캐시 우선, 없으면 fetcher)
         portfolio = self.trade_store.get_portfolio_summary()
@@ -238,7 +238,7 @@ class ScanApplication:
 
     @staticmethod
     def _build_daily_message(
-        alerted_info: list[tuple[str, int, int, float | None]],
+        alerted_info: list[tuple[str, int, int, float | None, str]],
         portfolio: list[Trade],
         portfolio_prices: dict[str, float | None],
         today: date,
@@ -250,11 +250,13 @@ class ScanApplication:
         # 신호 섹션
         if alerted_info:
             lines.append("⚡ 신호")
-            for symbol, track, score, price in alerted_info:
+            for symbol, track, score, price, condition_detail in alerted_info:
                 track_label = "⚡고수익" if track == 1 else "🛡️안전"
                 target_pct = "+20%" if track == 1 else "+10%"
                 price_str = f"${price:,.2f}" if price is not None else "N/A"
                 lines.append(f"• {symbol} {track_label} ({score}점) | {price_str} | {target_pct} | 30일")
+                if condition_detail:
+                    lines.append(f"  {condition_detail}")
         else:
             lines.append("⚡ 신호: 없음")
 

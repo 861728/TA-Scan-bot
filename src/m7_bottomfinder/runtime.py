@@ -35,6 +35,7 @@ class ScanCycleResult:
     ai_called: bool
     ai_reason: str
     data_source: str
+    condition_detail: str = ""
 
 
 class ScannerRuntime:
@@ -82,6 +83,9 @@ class ScannerRuntime:
         results, summary = self.indicator_engine.run(cached_bars, config.symbol)
         decision = self.alert_engine.decide(config.symbol, summary, results, ts)
 
+        from .indicators import get_condition_labels
+        condition_detail = get_condition_labels(cached_bars, summary.track) if decision.should_send else ""
+
         if self.metrics is not None:
             self.metrics.record_cycle(
                 data_source=recovered.source,
@@ -97,5 +101,6 @@ class ScannerRuntime:
             ai_called=False,
             ai_reason="",
             data_source=recovered.source,
+            condition_detail=condition_detail,
         )
 
