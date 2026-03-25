@@ -478,44 +478,47 @@ class MACDDivergenceIndicator(BaseIndicator):
 
 
 def calculate_score(bars: list[Bar]) -> int:
-    """바닥 종합 점수 (0~9). RSI·고점낙폭·저가근접·CMF 기반."""
+    """바닥 종합 점수 (0~6). RSI·200MA·60일낙폭·CMF·OBV다이버전스·거래량급증 기반."""
     if len(bars) < 30:
         return 0
 
     closes = [b.close for b in bars]
     score = 0
 
-    # RSI
+    # RSI 30 이하 (+1)
     r = _last(_rsi(closes), 50.0)
-    if r < 30:
-        score += 3
-    elif r < 40:
-        score += 2
-    elif r < 50:
+    if r <= 30:
         score += 1
 
-    # 고점 대비 낙폭
-    year_high = max(b.high for b in bars[-252:]) if len(bars) >= 252 else max(b.high for b in bars)
-    high_dist = (closes[-1] / year_high - 1) * 100
+    # 200MA 아래 (+1)
+    sma200_val = _last(_sma(closes, 200), closes[-1]) if len(closes) >= 200 else _last(_sma(closes, len(closes)), closes[-1])
+    if closes[-1] < sma200_val:
+        score += 1
+
+    # 60일 고점 대비 -20% 이상 낙폭 (+1)
+    window_60 = bars[-60:] if len(bars) >= 60 else bars
+    high_60 = max(b.high for b in window_60)
+    high_dist = (closes[-1] / high_60 - 1) * 100
     if high_dist <= -20:
-        score += 3
+        score += 1
 
-    # 52주 저가 대비 위치
-    year_low = min(b.low for b in bars[-252:]) if len(bars) >= 252 else min(b.low for b in bars)
-    low_dist = (closes[-1] / year_low - 1) * 100
-    if low_dist <= 20:
-        score += 2
+    # CMF 양수 (+1)
+    cmf_last = _last(_cmf(bars), 0.0)
+    if cmf_last > 0:
+        score += 1
 
-    # CMF 음수
-    mf_sum = vol_sum = 0.0
-    for b in bars[-20:]:
-        if b.high != b.low:
-            mfm = ((b.close - b.low) - (b.high - b.close)) / (b.high - b.low)
-        else:
-            mfm = 0.0
-        mf_sum += mfm * b.volume
-        vol_sum += b.volume
-    if vol_sum > 0 and mf_sum / vol_sum < 0:
+    # OBV 다이버전스 — 최근 5일 가격 하락 중 OBV 상승 (+1)
+    if len(bars) >= 5:
+        price_down = closes[-1] < closes[-5]
+        obv = _obv(bars)
+        obv_up = obv[-1] > obv[-5]
+        if price_down and obv_up:
+            score += 1
+
+    # 거래량 급증 — 20일 평균 2배 이상 (+1)
+    vol_window = bars[-20:] if len(bars) >= 20 else bars
+    avg_vol = sum(b.volume for b in vol_window) / len(vol_window)
+    if avg_vol > 0 and bars[-1].volume >= avg_vol * 2.0:
         score += 1
 
     return score

@@ -1,14 +1,5 @@
 [runtime]
-symbols = [
-  "AAPL", "MSFT", "NVDA", "AMZN", "GOOG", "GOOGL", "META", "TSLA", "AVGO", "COST",
-  "NFLX", "ASML", "AMD", "PEP", "CSCO", "ADBE", "QCOM", "INTU", "AMAT", "TXN",
-  "BKNG", "ISRG", "MU", "HON", "VRTX", "REGN", "PANW", "KLAC", "LRCX", "SNPS",
-  "CDNS", "ABNB", "MELI", "ORLY", "FTNT", "CTAS", "MRVL", "MNST", "KDP", "ODFL",
-  "DXCM", "TEAM", "FAST", "ROST", "IDXX", "BIIB", "VRSK", "GEHC", "ON", "NXPI",
-  "CTSH", "CPRT", "PCAR", "PAYX", "DLTR", "ANSS", "FANG", "ZS", "CRWD", "DDOG",
-  "EBAY", "EXC", "ILMN", "LULU", "MAR", "MCHP", "MDLZ", "MRNA", "PYPL", "SBUX",
-  "WDAY", "ADP", "ALGN", "GILD", "MTCH", "NDAQ", "TTWO", "WBD", "ENPH", "ENTG"
-]
+symbols = ["NVDA", "MRVL", "CRWD", "ZS", "ON", "MU", "LRCX", "NFLX", "KLAC"]
 timeframe = "1d"
 htf_filter = ["1h", "1d"]
 interval_seconds = 86400
@@ -21,7 +12,7 @@ track1_symbols = ["NVDA", "MRVL", "CRWD", "ZS", "ON"]
 track2_symbols = ["MU", "LRCX", "NFLX", "KLAC"]
 
 [scoring]
-track1_threshold  = 4   # 바닥반등 트랙 최소 점수 (max 9)
+track1_threshold  = 4   # 바닥반등 트랙 최소 점수 (max 6)
 track2_threshold  = 5   # 눌림목 트랙 최소 점수 (max 6)
 ai_call_threshold = 6
 min_s_hits_for_ai = 2
