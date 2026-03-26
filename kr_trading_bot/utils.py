@@ -13,6 +13,7 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 
+import config as config
 from config import (
     BB_PERIOD,
     BB_STD,
@@ -25,7 +26,6 @@ from config import (
     STRONG_BB_WIDTH,
     STRONG_CANDLE_PCT,
     STRONG_DROP_20D,
-    TRADES_PATH,
     VOLUME_AVG_PERIOD,
     VOLUME_RATIO_MIN,
     WEAK_CANDLE_PCT,
@@ -258,7 +258,7 @@ def classify_signal(df: pd.DataFrame) -> str | None:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def load_trades() -> list[dict]:
-    path = Path(TRADES_PATH)
+    path = Path(config.TRADES_PATH)
     if not path.exists():
         return []
     with open(path, "r", encoding="utf-8") as f:
@@ -266,7 +266,7 @@ def load_trades() -> list[dict]:
 
 
 def save_trades(trades: list[dict]) -> None:
-    path = Path(TRADES_PATH)
+    path = Path(config.TRADES_PATH)
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(trades, f, ensure_ascii=False, indent=2)
