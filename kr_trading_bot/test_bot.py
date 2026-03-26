@@ -1,7 +1,10 @@
 """bot.py 검증 테스트 (목업 기반, 네트워크 불필요)."""
 
 import sys
+import os
 sys.path.insert(0, ".")
+os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test")
+os.environ.setdefault("TELEGRAM_CHAT_ID", "test")
 
 import asyncio
 import json

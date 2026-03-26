@@ -1,7 +1,10 @@
 """scanner.py 검증 테스트 (목업 데이터 기반)."""
 
 import sys
+import os
 sys.path.insert(0, ".")
+os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test")
+os.environ.setdefault("TELEGRAM_CHAT_ID", "test")
 
 import json
 import os

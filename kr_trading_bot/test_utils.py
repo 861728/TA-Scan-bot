@@ -1,7 +1,10 @@
 """utils.py 검증 테스트 (모의 데이터 기반)."""
 
 import sys
+import os
 sys.path.insert(0, ".")
+os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test")
+os.environ.setdefault("TELEGRAM_CHAT_ID", "test")
 
 import numpy as np
 import pandas as pd
