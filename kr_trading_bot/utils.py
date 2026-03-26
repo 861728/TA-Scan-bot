@@ -83,10 +83,25 @@ def calc_candle_body_pct(open_: pd.Series, close: pd.Series) -> pd.Series:
 # 종목 리스트 & 업종 필터
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+def _normalize_stock_df(df: pd.DataFrame, market: str) -> pd.DataFrame:
+    """FDR 버전별 컬럼명 차이 보정 → Code, Name, Market 통일."""
+    col_map = {}
+    for col in df.columns:
+        low = col.lower()
+        if low in ("code", "symbol", "ticker", "종목코드"):
+            col_map[col] = "Code"
+        elif low in ("name", "종목명"):
+            col_map[col] = "Name"
+    df = df.rename(columns=col_map)
+    if "Code" not in df.columns or "Name" not in df.columns:
+        return pd.DataFrame(columns=["Code", "Name", "Market"])
+    return df[["Code", "Name"]].assign(Market=market)
+
+
 def get_all_stocks() -> pd.DataFrame:
     """코스피+코스닥 전종목 리스트 (Code, Name, Market)."""
-    kospi = fdr.StockListing("KOSPI")[["Code", "Name"]].assign(Market="KOSPI")
-    kosdaq = fdr.StockListing("KOSDAQ")[["Code", "Name"]].assign(Market="KOSDAQ")
+    kospi = _normalize_stock_df(fdr.StockListing("KOSPI"), "KOSPI")
+    kosdaq = _normalize_stock_df(fdr.StockListing("KOSDAQ"), "KOSDAQ")
     return pd.concat([kospi, kosdaq], ignore_index=True)
 
 
@@ -131,8 +146,11 @@ def get_sector_map() -> dict[str, str]:
     return sector_map
 
 
-def filter_excluded_sectors(stocks: pd.DataFrame, sector_map: dict[str, str]) -> pd.DataFrame:
-    """제외 업종에 해당하는 종목을 걸러낸다."""
+def filter_excluded_sectors(stocks, sector_map: dict[str, str]) -> pd.DataFrame:
+    """제외 업종에 해당하는 종목을 걸러낸다. stocks는 DataFrame 또는 dict 리스트."""
+    if isinstance(stocks, list):
+        stocks = pd.DataFrame(stocks)
+
     excluded_codes = set()
     for code, sector in sector_map.items():
         for excl in EXCLUDED_SECTORS:
