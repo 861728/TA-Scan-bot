@@ -131,11 +131,11 @@ async def test_send_entry_alert_multiple():
     assert bot.send_message.call_count == 2
 
 
-# ── /buy ─────────────────────────────────────────────────
+# ── /us_buy ──────────────────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_cmd_buy_success(db_path):
-    update = _make_update("/buy TSLA 234.50")
+    update = _make_update("/us_buy TSLA 234.50")
     ctx = _make_context(["TSLA", "234.50"])
     with patch("us_trading_bot.notifier.DB_PATH", db_path), \
          patch("us_trading_bot.notifier.fetch_single", return_value=SAMPLE_FULL_IND):
@@ -149,7 +149,7 @@ async def test_cmd_buy_success(db_path):
 
 @pytest.mark.asyncio
 async def test_cmd_buy_no_args(db_path):
-    update = _make_update("/buy")
+    update = _make_update("/us_buy")
     ctx = _make_context([])
     with patch("us_trading_bot.notifier.DB_PATH", db_path):
         await cmd_buy(update, ctx)
@@ -159,7 +159,7 @@ async def test_cmd_buy_no_args(db_path):
 
 @pytest.mark.asyncio
 async def test_cmd_buy_bad_price(db_path):
-    update = _make_update("/buy TSLA abc")
+    update = _make_update("/us_buy TSLA abc")
     ctx = _make_context(["TSLA", "abc"])
     with patch("us_trading_bot.notifier.DB_PATH", db_path):
         await cmd_buy(update, ctx)
@@ -170,7 +170,7 @@ async def test_cmd_buy_bad_price(db_path):
 @pytest.mark.asyncio
 async def test_cmd_buy_duplicate(db_path):
     add_position("TSLA", "2026-03-01", 200.0, SAMPLE_IND, db_path)
-    update = _make_update("/buy TSLA 234.50")
+    update = _make_update("/us_buy TSLA 234.50")
     ctx = _make_context(["TSLA", "234.50"])
     with patch("us_trading_bot.notifier.DB_PATH", db_path):
         await cmd_buy(update, ctx)
@@ -180,7 +180,7 @@ async def test_cmd_buy_duplicate(db_path):
 
 @pytest.mark.asyncio
 async def test_cmd_buy_indicator_fail(db_path):
-    update = _make_update("/buy MU 80.00")
+    update = _make_update("/us_buy MU 80.00")
     ctx = _make_context(["MU", "80.00"])
     with patch("us_trading_bot.notifier.DB_PATH", db_path), \
          patch("us_trading_bot.notifier.fetch_single", return_value=None):
@@ -191,12 +191,12 @@ async def test_cmd_buy_indicator_fail(db_path):
     assert get_position("MU", db_path) is not None
 
 
-# ── /sell ────────────────────────────────────────────────
+# ── /us_sell ─────────────────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_cmd_sell_success(db_path):
     add_position("TSLA", "2026-03-01", 200.0, SAMPLE_IND, db_path)
-    update = _make_update("/sell TSLA 250.00")
+    update = _make_update("/us_sell TSLA 250.00")
     ctx = _make_context(["TSLA", "250.00"])
     with patch("us_trading_bot.notifier.DB_PATH", db_path):
         await cmd_sell(update, ctx)
@@ -208,7 +208,7 @@ async def test_cmd_sell_success(db_path):
 
 @pytest.mark.asyncio
 async def test_cmd_sell_no_position(db_path):
-    update = _make_update("/sell FAKE 100.00")
+    update = _make_update("/us_sell FAKE 100.00")
     ctx = _make_context(["FAKE", "100.00"])
     with patch("us_trading_bot.notifier.DB_PATH", db_path):
         await cmd_sell(update, ctx)
@@ -218,7 +218,7 @@ async def test_cmd_sell_no_position(db_path):
 
 @pytest.mark.asyncio
 async def test_cmd_sell_no_args(db_path):
-    update = _make_update("/sell")
+    update = _make_update("/us_sell")
     ctx = _make_context([])
     with patch("us_trading_bot.notifier.DB_PATH", db_path):
         await cmd_sell(update, ctx)
@@ -229,7 +229,7 @@ async def test_cmd_sell_no_args(db_path):
 @pytest.mark.asyncio
 async def test_cmd_sell_negative_return(db_path):
     add_position("AMD", "2026-03-01", 100.0, SAMPLE_IND, db_path)
-    update = _make_update("/sell AMD 90.00")
+    update = _make_update("/us_sell AMD 90.00")
     ctx = _make_context(["AMD", "90.00"])
     with patch("us_trading_bot.notifier.DB_PATH", db_path):
         await cmd_sell(update, ctx)
@@ -237,11 +237,11 @@ async def test_cmd_sell_negative_return(db_path):
     assert "-10.0%" in reply
 
 
-# ── /positions ───────────────────────────────────────────
+# ── /us_positions ────────────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_cmd_positions_empty(db_path):
-    update = _make_update("/positions")
+    update = _make_update("/us_positions")
     ctx = _make_context()
     with patch("us_trading_bot.notifier.DB_PATH", db_path):
         await cmd_positions(update, ctx)
@@ -259,7 +259,7 @@ async def test_cmd_positions_with_data(db_path):
         "NVDA": {"close": 130.0, "open": 128.0, "rsi14": 55, "rsi5": 55,
                   "bb_pct": 0.6, "drawdown": -3, "vol_ratio": 1.1},
     }
-    update = _make_update("/positions")
+    update = _make_update("/us_positions")
     ctx = _make_context()
     with patch("us_trading_bot.notifier.DB_PATH", db_path), \
          patch("us_trading_bot.notifier.fetch_all", return_value=live):
@@ -274,7 +274,7 @@ async def test_cmd_positions_with_data(db_path):
 @pytest.mark.asyncio
 async def test_cmd_positions_live_fail(db_path):
     add_position("TSLA", "2026-03-01", 200.0, SAMPLE_IND, db_path)
-    update = _make_update("/positions")
+    update = _make_update("/us_positions")
     ctx = _make_context()
     with patch("us_trading_bot.notifier.DB_PATH", db_path), \
          patch("us_trading_bot.notifier.fetch_all", return_value={}):
@@ -283,11 +283,11 @@ async def test_cmd_positions_live_fail(db_path):
     assert "조회실패" in reply
 
 
-# ── /history ─────────────────────────────────────────────
+# ── /us_history ──────────────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_cmd_history_empty(db_path):
-    update = _make_update("/history")
+    update = _make_update("/us_history")
     ctx = _make_context()
     with patch("us_trading_bot.notifier.DB_PATH", db_path):
         await cmd_history(update, ctx)
@@ -307,7 +307,7 @@ async def test_cmd_history_with_data(db_path):
     add_trade(pos2, "2026-03-22", 90.0, "forced", db_path)
     remove_position("AMD", db_path)
 
-    update = _make_update("/history")
+    update = _make_update("/us_history")
     ctx = _make_context()
     with patch("us_trading_bot.notifier.DB_PATH", db_path):
         await cmd_history(update, ctx)
@@ -318,13 +318,13 @@ async def test_cmd_history_with_data(db_path):
     assert "강제청산" in reply
 
 
-# ── /scan ────────────────────────────────────────────────
+# ── /us_scan ─────────────────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_cmd_scan_with_signals(db_path):
     candidates = [{"ticker": "TSLA", "close": 234.50, "rsi14": 28.3,
                     "rsi5": 14.2, "bb_pct": 0.032, "drawdown": -24.1, "vol_ratio": 1.85}]
-    update = _make_update("/scan")
+    update = _make_update("/us_scan")
     ctx = _make_context()
     with patch("us_trading_bot.notifier.DB_PATH", db_path), \
          patch("us_trading_bot.notifier.scan_entries", return_value=candidates):
@@ -337,7 +337,7 @@ async def test_cmd_scan_with_signals(db_path):
 
 @pytest.mark.asyncio
 async def test_cmd_scan_no_signals(db_path):
-    update = _make_update("/scan")
+    update = _make_update("/us_scan")
     ctx = _make_context()
     with patch("us_trading_bot.notifier.DB_PATH", db_path), \
          patch("us_trading_bot.notifier.scan_entries", return_value=[]):
@@ -346,13 +346,13 @@ async def test_cmd_scan_no_signals(db_path):
     assert any("진입 신호 없음" in t for t in texts)
 
 
-# ── /sellcheck ───────────────────────────────────────────
+# ── /us_sellcheck ────────────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_cmd_sellcheck_with_signals(db_path):
     targets = [{"ticker": "TSLA", "exit_type": "peak", "close": 289.30,
                 "hold_days": 23, "return_pct": 23.4}]
-    update = _make_update("/sellcheck")
+    update = _make_update("/us_sellcheck")
     ctx = _make_context()
     with patch("us_trading_bot.notifier.DB_PATH", db_path), \
          patch("us_trading_bot.notifier.scan_exits", return_value=targets):
@@ -362,7 +362,7 @@ async def test_cmd_sellcheck_with_signals(db_path):
 
 @pytest.mark.asyncio
 async def test_cmd_sellcheck_no_signals(db_path):
-    update = _make_update("/sellcheck")
+    update = _make_update("/us_sellcheck")
     ctx = _make_context()
     with patch("us_trading_bot.notifier.DB_PATH", db_path), \
          patch("us_trading_bot.notifier.scan_exits", return_value=[]):

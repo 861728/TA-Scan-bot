@@ -72,9 +72,9 @@ async def send_no_signal(bot):
 # ── 텔레그램 명령어 핸들러 ────────────────────────────────
 
 async def cmd_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """사용법: /buy TSLA 234.50"""
+    """사용법: /us_buy TSLA 234.50"""
     if not context.args or len(context.args) != 2:
-        await update.message.reply_text("사용법: /buy 종목 가격\n예: /buy TSLA 234.50")
+        await update.message.reply_text("사용법: /us_buy 종목 가격\n예: /us_buy TSLA 234.50")
         return
 
     ticker = context.args[0].upper()
@@ -118,9 +118,9 @@ async def cmd_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_sell(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """사용법: /sell TSLA 289.30"""
+    """사용법: /us_sell TSLA 289.30"""
     if not context.args or len(context.args) != 2:
-        await update.message.reply_text("사용법: /sell 종목 가격\n예: /sell TSLA 289.30")
+        await update.message.reply_text("사용법: /us_sell 종목 가격\n예: /us_sell TSLA 289.30")
         return
 
     ticker = context.args[0].upper()
@@ -148,7 +148,7 @@ async def cmd_sell(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_positions(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/positions — 보유 포지션 조회"""
+    """/us_positions — 보유 포지션 조회"""
     positions = get_positions(DB_PATH)
     if not positions:
         await update.message.reply_text("보유 중인 포지션 없음")
@@ -183,7 +183,7 @@ async def cmd_positions(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_history(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/history — 전체 거래 내역"""
+    """/us_history — 전체 거래 내역"""
     trades = get_trades(DB_PATH)
     if not trades:
         await update.message.reply_text("거래 내역 없음")
@@ -211,7 +211,7 @@ async def cmd_history(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_scan(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/scan — 수동 전종목 스캔"""
+    """/us_scan — 수동 전종목 스캔"""
     await update.message.reply_text("🔍 스캔 중...")
     candidates = scan_entries(DB_PATH)
     if candidates:
@@ -222,7 +222,7 @@ async def cmd_scan(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_sellcheck(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/sellcheck — 보유 종목 매도 신호 확인"""
+    """/us_sellcheck — 보유 종목 매도 신호 확인"""
     await update.message.reply_text("🔍 매도 체크 중...")
     targets = scan_exits(DB_PATH)
     if targets:
@@ -238,10 +238,10 @@ def build_app(token=None):
     """텔레그램 봇 Application 생성 (polling 용)"""
     token = token or TELEGRAM_BOT_TOKEN
     app = Application.builder().token(token).build()
-    app.add_handler(CommandHandler("buy", cmd_buy))
-    app.add_handler(CommandHandler("sell", cmd_sell))
-    app.add_handler(CommandHandler("positions", cmd_positions))
-    app.add_handler(CommandHandler("history", cmd_history))
-    app.add_handler(CommandHandler("scan", cmd_scan))
-    app.add_handler(CommandHandler("sellcheck", cmd_sellcheck))
+    app.add_handler(CommandHandler("us_buy", cmd_buy))
+    app.add_handler(CommandHandler("us_sell", cmd_sell))
+    app.add_handler(CommandHandler("us_positions", cmd_positions))
+    app.add_handler(CommandHandler("us_history", cmd_history))
+    app.add_handler(CommandHandler("us_scan", cmd_scan))
+    app.add_handler(CommandHandler("us_sellcheck", cmd_sellcheck))
     return app
