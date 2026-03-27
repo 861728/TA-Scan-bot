@@ -11,7 +11,7 @@ import logging
 import asyncio
 import sys
 
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 from us_trading_bot.config import (
@@ -55,20 +55,27 @@ async def exit_check_and_alert(bot):
         logger.exception("청산 체크 중 에러")
 
 
+def _run_async(coro):
+    """BackgroundScheduler 스레드에서 async 함수 실행"""
+    loop = asyncio.new_event_loop()
+    try:
+        loop.run_until_complete(coro)
+    finally:
+        loop.close()
+
+
 def create_scheduler(bot):
     """APScheduler 생성 + 06:00, 06:05 작업 등록"""
-    scheduler = AsyncIOScheduler(timezone=TIMEZONE)
+    scheduler = BackgroundScheduler(timezone=TIMEZONE)
     scheduler.add_job(
-        scan_and_alert,
+        lambda: _run_async(scan_and_alert(bot)),
         trigger=CronTrigger(hour=6, minute=0, timezone=TIMEZONE),
-        args=[bot],
         id="scan_entries",
         name="진입 스캔 (06:00 KST)",
     )
     scheduler.add_job(
-        exit_check_and_alert,
+        lambda: _run_async(exit_check_and_alert(bot)),
         trigger=CronTrigger(hour=6, minute=5, timezone=TIMEZONE),
-        args=[bot],
         id="exit_check",
         name="청산 체크 (06:05 KST)",
     )
