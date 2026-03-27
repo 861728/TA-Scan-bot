@@ -107,7 +107,10 @@ class IndicatorEngine:
         neutral = len(results) - bullish - bearish
 
         track = 2 if symbol in self.track2_symbols else 1
-        composite = calculate_track2_score(bars) if track == 2 else calculate_score(bars)
+        if track == 2:
+            composite = calculate_track2_score(bars)
+        else:
+            composite, _ = calculate_score(bars)
         threshold = self.track2_threshold if track == 2 else self.track1_threshold
         should_alert = composite >= threshold
 
