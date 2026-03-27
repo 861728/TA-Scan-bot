@@ -477,51 +477,57 @@ class MACDDivergenceIndicator(BaseIndicator):
         return IndicatorResult(self.name, SignalDirection.BULLISH if bull else SignalDirection.NEUTRAL, self.weight if bull else 0, signal.evidence, {"kind": signal.kind.value}, normalize_timestamp(bars[-1].timestamp))
 
 
-def calculate_score(bars: list[Bar]) -> int:
-    """바닥 종합 점수 (0~6). RSI·200MA·60일낙폭·CMF·OBV다이버전스·거래량급증 기반."""
+def calculate_score(bars: list[Bar]) -> tuple[int, list[str]]:
+    """바닥 종합 점수 (0~6) + 충족 조건 목록. RSI·200MA·60일낙폭·CMF·OBV다이버전스·거래량급증 기반."""
     if len(bars) < 30:
-        return 0
+        return 0, []
 
     closes = [b.close for b in bars]
     score = 0
+    labels: list[str] = []
 
     # RSI 30 이하 (+1)
     r = _last(_rsi(closes), 50.0)
     if r <= 30:
         score += 1
+        labels.append(f"RSI {r:.1f}")
 
     # 200MA 아래 (+1)
     sma200_val = _last(_sma(closes, 200), closes[-1]) if len(closes) >= 200 else _last(_sma(closes, len(closes)), closes[-1])
     if closes[-1] < sma200_val:
         score += 1
+        labels.append("200MA 아래")
 
     # 60일 고점 대비 -20% 이상 낙폭 (+1)
     window_60 = bars[-60:] if len(bars) >= 60 else bars
     high_60 = max(b.high for b in window_60)
-    high_dist = (closes[-1] / high_60 - 1) * 100
-    if high_dist <= -20:
+    drop = (closes[-1] / high_60 - 1) * 100
+    if drop <= -20:
         score += 1
+        labels.append(f"낙폭 {drop:.1f}%")
 
     # CMF 양수 (+1)
-    cmf_last = _last(_cmf(bars), 0.0)
-    if cmf_last > 0:
+    cmf = _last(_cmf(bars), 0.0)
+    if cmf > 0:
         score += 1
+        labels.append(f"CMF {cmf:.3f}")
 
-    # OBV 다이버전스 — 최근 5일 가격 하락 중 OBV 상승 (+1)
+    # OBV 다이버전스 — 5일 기준 가격 하락 + OBV 상승 (+1)
     if len(bars) >= 5:
-        price_down = closes[-1] < closes[-5]
         obv = _obv(bars)
-        obv_up = obv[-1] > obv[-5]
-        if price_down and obv_up:
+        if closes[-1] < closes[-5] and obv[-1] > obv[-5]:
             score += 1
+            labels.append("OBV 다이버전스")
 
     # 거래량 급증 — 20일 평균 2배 이상 (+1)
     vol_window = bars[-20:] if len(bars) >= 20 else bars
     avg_vol = sum(b.volume for b in vol_window) / len(vol_window)
     if avg_vol > 0 and bars[-1].volume >= avg_vol * 2.0:
+        ratio = bars[-1].volume / avg_vol
         score += 1
+        labels.append(f"거래량 {ratio:.1f}x")
 
-    return score
+    return score, labels
 
 
 def calculate_track2_score(bars: list[Bar]) -> int:
@@ -564,79 +570,45 @@ def calculate_track2_score(bars: list[Bar]) -> int:
 
 
 def get_condition_labels(bars: list[Bar], track: int) -> str:
-    """충족된 조건만 사람이 읽기 좋은 텍스트로 반환 (신호 상세 표시용)."""
+    """충족된 조건을 사람이 읽기 좋은 텍스트로 반환 (신호 상세 표시용)."""
     if len(bars) < 30:
         return ""
 
+    if track == 1:
+        _, labels = calculate_score(bars)
+        return " / ".join(labels)
+
+    # track == 2: 눌림목 조건 직접 계산
     closes = [b.close for b in bars]
     parts: list[str] = []
 
-    if track == 1:
-        # RSI 30 이하
-        r = _last(_rsi(closes), 50.0)
-        if r <= 30:
-            parts.append(f"RSI {r:.1f}")
+    # 200MA 위
+    sma200_val = _last(_sma(closes, 200), closes[-1]) if len(closes) >= 200 else _last(_sma(closes, len(closes)), closes[-1])
+    if closes[-1] > sma200_val:
+        parts.append("200MA 위")
 
-        # 200MA 아래
-        sma200_val = _last(_sma(closes, 200), closes[-1]) if len(closes) >= 200 else _last(_sma(closes, len(closes)), closes[-1])
-        if closes[-1] < sma200_val:
-            parts.append("200MA 아래")
+    # 20MA 아래
+    sma20_val = _last(_sma(closes, 20), closes[-1])
+    if closes[-1] < sma20_val:
+        parts.append("20MA 아래")
 
-        # 60일 고점대비 -20% 이상 낙폭
-        window_60 = bars[-60:] if len(bars) >= 60 else bars
-        high_60 = max(b.high for b in window_60)
-        high_dist = (closes[-1] / high_60 - 1) * 100
-        if high_dist <= -20:
-            parts.append(f"낙폭 {high_dist:.1f}%")
+    # RSI 38~48
+    r = _last(_rsi(closes), 50.0)
+    if 38 <= r <= 48:
+        parts.append(f"RSI {r:.1f}")
 
-        # CMF 유입 (> 0)
-        cmf_last = _last(_cmf(bars), 0.0)
-        if cmf_last > 0:
-            parts.append(f"CMF {cmf_last:.3f}")
+    # 60일 고점대비 -12~20% 낙폭
+    window_60 = bars[-60:] if len(bars) >= 60 else bars
+    high_60 = max(b.high for b in window_60)
+    high_dist = (closes[-1] / high_60 - 1) * 100
+    if -20 <= high_dist <= -12:
+        parts.append(f"낙폭 {high_dist:.1f}%")
 
-        # OBV 다이버전스
-        obv = _obv(bars)
-        detector = DivergenceDetector(pivot_window=1)
-        sig = detector.detect(closes, obv, [b.timestamp for b in bars])
-        if sig.found and sig.kind == DivergenceType.BULLISH:
-            parts.append("OBV 다이버전스")
-
-        # 거래량 급증 (2배 이상)
-        vol_window = bars[-20:] if len(bars) >= 20 else bars
-        avg_vol = sum(b.volume for b in vol_window) / len(vol_window)
-        if avg_vol > 0:
-            ratio = bars[-1].volume / avg_vol
-            if ratio >= 2.0:
-                parts.append(f"거래량 {ratio:.1f}x")
-
-    else:  # track == 2
-        # 200MA 위
-        sma200_val = _last(_sma(closes, 200), closes[-1]) if len(closes) >= 200 else _last(_sma(closes, len(closes)), closes[-1])
-        if closes[-1] > sma200_val:
-            parts.append("200MA 위")
-
-        # 20MA 아래
-        sma20_val = _last(_sma(closes, 20), closes[-1])
-        if closes[-1] < sma20_val:
-            parts.append("20MA 아래")
-
-        # RSI 38~48
-        r = _last(_rsi(closes), 50.0)
-        if 38 <= r <= 48:
-            parts.append(f"RSI {r:.1f}")
-
-        # 60일 고점대비 -12~20% 낙폭
-        window_60 = bars[-60:] if len(bars) >= 60 else bars
-        high_60 = max(b.high for b in window_60)
-        high_dist = (closes[-1] / high_60 - 1) * 100
-        if -20 <= high_dist <= -12:
-            parts.append(f"낙폭 {high_dist:.1f}%")
-
-        # 거래량 감소 (20일 평균의 0.9배 이하)
-        vol_window = bars[-20:] if len(bars) >= 20 else bars
-        avg_vol = sum(b.volume for b in vol_window) / len(vol_window)
-        if avg_vol > 0 and bars[-1].volume <= avg_vol * 0.9:
-            parts.append("거래량 감소")
+    # 거래량 감소 (20일 평균의 0.9배 이하)
+    vol_window = bars[-20:] if len(bars) >= 20 else bars
+    avg_vol = sum(b.volume for b in vol_window) / len(vol_window)
+    if avg_vol > 0 and bars[-1].volume <= avg_vol * 0.9:
+        parts.append("거래량 감소")
 
     return " / ".join(parts)
 
