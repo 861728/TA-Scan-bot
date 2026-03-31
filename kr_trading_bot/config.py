@@ -4,12 +4,12 @@ import os
 import sys
 
 # ── 텔레그램 ──
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN_KR", "")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
 
 if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
-    print("ERROR: 환경변수 TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID를 설정하세요.")
-    print("  export TELEGRAM_BOT_TOKEN='your-token'")
+    print("ERROR: 환경변수 TELEGRAM_BOT_TOKEN_KR, TELEGRAM_CHAT_ID를 설정하세요.")
+    print("  export TELEGRAM_BOT_TOKEN_KR='your-token'")
     print("  export TELEGRAM_CHAT_ID='your-chat-id'")
     sys.exit(1)
 

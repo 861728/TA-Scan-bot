@@ -3,7 +3,7 @@
 import sys
 import os
 sys.path.insert(0, ".")
-os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test")
+os.environ.setdefault("TELEGRAM_BOT_TOKEN_KR", "test")
 os.environ.setdefault("TELEGRAM_CHAT_ID", "test")
 
 import asyncio
