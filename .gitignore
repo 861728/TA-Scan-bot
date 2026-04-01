@@ -6,3 +6,5 @@ config.toml
 .env
 trades.db
 .venv/
+data/
+storage/

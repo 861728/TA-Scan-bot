@@ -1,0 +1,11 @@
+{
+    "actorSpecification": 1,
+    "name": "m7-bottomfinder",
+    "title": "M7 BottomFinder - NASDAQ Bottom Scanner",
+    "description": "Scans NASDAQ tech stocks for bottom/pullback buy signals and sends alerts via Telegram.",
+    "version": "0.1.0",
+    "buildTag": "latest",
+    "environmentVariables": [],
+    "input": "./input_schema.json",
+    "dockerfile": "./Dockerfile"
+}
